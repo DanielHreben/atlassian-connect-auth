@@ -1,0 +1,44 @@
+{
+  "name": "atlassian-connect-auth",
+  "version": "1.0.1",
+  "description": "",
+  "main": "lib/index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [
+    "atlassian",
+    "atlassian-jira",
+    "atlassian-bitbucket",
+    "atlassian-connect",
+    "atlassian-connect-addon",
+    "atlassian-connect"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DanielHreben/atlassian-connect-auth.git"
+  },
+  "author": {
+    "name": "Daniel Hreben",
+    "email": "daniel.hreben@gmail.com"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/DanielHreben/atlassian-connect-auth/issues"
+  },
+  "homepage": "https://github.com/DanielHreben/atlassian-connect-auth#readme",
+  "dependencies": {
+    "atlassian-jwt": "^0.1.5"
+  },
+  "devDependencies": {
+    "eslint": "^4.9.0",
+    "eslint-config-standard": "^10.2.1",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-node": "^5.2.0",
+    "eslint-plugin-promise": "^3.6.0",
+    "eslint-plugin-standard": "^3.0.1"
+  }
+}
