@@ -1,7 +1,7 @@
 {
   "name": "atlassian-connect-auth",
-  "version": "1.0.1",
-  "description": "",
+  "version": "1.0.2",
+  "description": "Helper for handling webhooks from Atlassian products",
   "main": "lib/index.js",
   "directories": {
     "lib": "lib"

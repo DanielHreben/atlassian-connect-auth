@@ -12,7 +12,7 @@ const addon = new Addon({
 const handleInstall = (req, res) => {
   try {
     await addon.install(req, {
-      loadCredentials: clientKey => model.Credentials.findOne({ clientKey }),
+      loadCredentials: clientKey => model.Credentials.findOne({ where: { clientKey } }),
       saveCredentials: (clientKey, newCredentials, storedCredentials) => {
         if (storedCredentials) {
           return storedCredentials.update(newCredentials)
@@ -37,7 +37,7 @@ const handleInstall = (req, res) => {
 const handleAuth = (req, res, next) => {
   try {
     await addon.auth(req, {
-      loadCredentials: clientKey => model.Credentials.findOne({ clientKey })
+      loadCredentials: clientKey => model.Credentials.findOne({ where: { clientKey } })
     })
 
     next()
