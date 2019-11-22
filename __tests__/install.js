@@ -90,9 +90,25 @@ describe('Installation', () => {
     })
   })
 
+  test('First Jira add-on install from the Connect point of view, but we already have the instance', async () => {
+    const req = { body: jiraPayload, headers: {}, query: {} }
+    const loadCredentials = () => jiraPayload
+
+    const result = await jiraAddon.install(req, {
+      loadCredentials,
+      saveCredentials
+    })
+
+    expect(result.credentials).toEqual(jiraPayload)
+  })
+
   test('Unauthorized request to updated existing instance', async () => {
     const loadCredentials = () => jiraPayload
-    const req = { body: jiraPayload, headers: {}, query: {} }
+    const req = {
+      body: { ...jiraPayload, sharedSecret: 'invalid-secret' },
+      headers: {},
+      query: {}
+    }
 
     await expect(jiraAddon.install(req, {
       loadCredentials,
