@@ -32,7 +32,7 @@
   },
   "homepage": "https://github.com/DanielHreben/atlassian-connect-auth#readme",
   "dependencies": {
-    "atlassian-jwt": "^0.1.5"
+    "atlassian-jwt": "^1.0.2"
   },
   "devDependencies": {
     "eslint": "^6.6.0",
