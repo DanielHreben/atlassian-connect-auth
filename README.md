@@ -1,4 +1,7 @@
 # atlassian-connect-auth
+
+[![Greenkeeper badge](https://badges.greenkeeper.io/DanielHreben/atlassian-connect-auth.svg)](https://greenkeeper.io/)
+
 Helper for handling webhooks from Atlassian products
 
 ```javascript
