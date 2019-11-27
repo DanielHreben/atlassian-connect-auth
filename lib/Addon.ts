@@ -8,11 +8,11 @@ import {
   DecodedTokenPayloadFields
 } from './types'
 
-type LoadCredentials<Credentials> = (
+export type LoadCredentials<Credentials> = (
   id: string
 ) => Promise<Credentials | undefined | null | void>;
 
-type SaveCredentials<Credentials, RequestBody> = (
+export type SaveCredentials<Credentials, RequestBody> = (
   id: string,
   body: RequestBody,
   credentials?: Credentials
@@ -21,17 +21,20 @@ type SaveCredentials<Credentials, RequestBody> = (
 export class Addon<
   Credentials extends { sharedSecret: string },
   DecodedTokenPayload extends DecodedTokenPayloadFields
-> {
+  > {
   private baseUrl: string;
 
   constructor (opts: { baseUrl: string }) {
     this.baseUrl = opts.baseUrl
   }
 
+  /**
+   * Handle installation webhook from Atlassian products.
+   */
   public async install<
     Request extends CommonRequestFields &
-      ClientIdRequestFields &
-      TokenRequestFields
+    ClientIdRequestFields &
+    TokenRequestFields
   > (
     req: Request,
     credentialsHandlers: {
@@ -54,8 +57,9 @@ export class Addon<
         id,
         req.body
       )
+
       return {
-        credentials: savedCredentials || req.body
+        credentials: savedCredentials
       }
     }
 
@@ -73,7 +77,7 @@ export class Addon<
         credentials
       )
       return {
-        credentials: updatedCredentials || req.body,
+        credentials: updatedCredentials,
         payload
       }
     }
@@ -84,6 +88,9 @@ export class Addon<
     )
   }
 
+  /**
+   * Check request jwt and return loaded Credentials
+   */
   public async auth<Request extends CommonRequestFields & TokenRequestFields> (
     req: Request,
     opts: { skipQsh?: boolean; loadCredentials: LoadCredentials<Credentials> }

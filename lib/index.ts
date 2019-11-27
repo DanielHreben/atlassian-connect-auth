@@ -1,2 +1,2 @@
-export { Addon } from './Addon'
+export { Addon, LoadCredentials, SaveCredentials } from './Addon'
 export { AuthError, AuthErrorCodes } from './AuthError'
