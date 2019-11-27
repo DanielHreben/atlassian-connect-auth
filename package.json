@@ -2,13 +2,16 @@
   "name": "atlassian-connect-auth",
   "version": "1.0.3",
   "description": "Helper for handling webhooks from Atlassian products",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "directories": {
-    "lib": "lib"
+    "lib": "lib",
+    "test": "__tests__"
   },
   "scripts": {
-    "test": "jest",
-    "lint": "eslint ."
+    "test": "jest --config jestconfig.json",
+    "lint": "eslint . --ext ts",
+    "build": "rm -rf ./dist; tsc"
   },
   "keywords": [
     "atlassian",
@@ -35,6 +38,10 @@
     "atlassian-jwt": "^1.0.2"
   },
   "devDependencies": {
+    "@types/express": "^4.17.2",
+    "@types/jest": "^24.0.23",
+    "@typescript-eslint/eslint-plugin": "^2.8.0",
+    "@typescript-eslint/parser": "^2.8.0",
     "eslint": "^6.6.0",
     "eslint-config-standard": "^14.1.0",
     "eslint-plugin-import": "^2.18.2",
@@ -42,6 +49,8 @@
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
-    "jest": "^24.9.0"
+    "jest": "^24.9.0",
+    "ts-jest": "^24.2.0",
+    "typescript": "^3.7.2"
   }
 }
