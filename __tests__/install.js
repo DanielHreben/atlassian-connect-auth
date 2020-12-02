@@ -1,5 +1,5 @@
 const jwt = require('atlassian-jwt')
-const { Addon } = require('../lib')
+const { Addon, AuthError } = require('../lib')
 
 const baseUrl = 'https://test.example.com'
 const saveCredentials = jest.fn()
@@ -49,6 +49,24 @@ describe('Installation', () => {
     expect(result.credentials).toEqual(bitbucketPayload)
   })
 
+  test('Failed to decode token', async () => {
+    const token = 'abc.def.ghi'
+
+    const req = {
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {}
+    }
+
+    await expect(jiraAddon.auth(req, {})).rejects.toMatchError(
+      new AuthError(
+        'Failed to decode token',
+        'FAILED_TO_DECODE',
+        new SyntaxError('Unexpected token i in JSON at position 0')
+      )
+    )
+  })
+
   test('Passed different id in body and authorization header', async () => {
     const loadCredentials = () => null
     const token = jwt.encode({
@@ -64,7 +82,9 @@ describe('Installation', () => {
     await expect(jiraAddon.install(req, {
       loadCredentials,
       saveCredentials
-    })).rejects.toThrow('Wrong issuer')
+    })).rejects.toMatchError(
+      new AuthError('Wrong issuer', 'WRONG_ISSUER')
+    )
   })
 
   test('Second and subsequent Jira add-on install', async () => {
@@ -97,6 +117,8 @@ describe('Installation', () => {
     await expect(jiraAddon.install(req, {
       loadCredentials,
       saveCredentials
-    })).rejects.toThrow('Unauthorized update request')
+    })).rejects.toMatchError(
+      new AuthError('Unauthorized update request', 'UNAUTHORIZED_REQUEST')
+    )
   })
 })

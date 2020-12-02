@@ -1,5 +1,5 @@
 const jwt = require('atlassian-jwt')
-const { Addon } = require('../lib')
+const { Addon, AuthError } = require('../lib')
 
 const baseUrl = 'https://test.example.com'
 
@@ -22,7 +22,27 @@ describe('Auth', () => {
       query: {}
     }
 
-    await expect(jiraAddon.auth(req, {})).rejects.toThrow('Missed token')
+    await expect(jiraAddon.auth(req, {})).rejects.toMatchError(
+      new AuthError('Missed token', 'MISSED_TOKEN')
+    )
+  })
+
+  test('Failed to decode token', async () => {
+    const token = 'abc.def.ghi'
+
+    const req = {
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {}
+    }
+
+    await expect(jiraAddon.auth(req, {})).rejects.toMatchError(
+      new AuthError(
+        'Failed to decode token',
+        'FAILED_TO_DECODE',
+        new SyntaxError('Unexpected token i in JSON at position 0')
+      )
+    )
   })
 
   test('Unknown issuer', async () => {
@@ -39,7 +59,9 @@ describe('Auth', () => {
 
     await expect(jiraAddon.auth(req, {
       loadCredentials
-    })).rejects.toThrow('Unknown issuer')
+    })).rejects.toMatchError(
+      new AuthError('Unknown issuer', 'UNKNOWN_ISSUER')
+    )
   })
 
   test('Invalid signature', async () => {
@@ -55,7 +77,15 @@ describe('Auth', () => {
 
     await expect(jiraAddon.auth(req, {
       loadCredentials: () => jiraPayload
-    })).rejects.toThrow('Invalid signature')
+    })).rejects.toMatchError(
+      new AuthError(
+        'Invalid signature',
+        'INVALID_SIGNATURE',
+        new Error(
+          'Signature verification failed for input: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqaXJhLWNsaWVudC1rZXkifQ with method sha256'
+        )
+      )
+    )
   })
 
   test('Token expired', async () => {
@@ -74,7 +104,9 @@ describe('Auth', () => {
 
     await expect(jiraAddon.auth(req, {
       loadCredentials: () => jiraPayload
-    })).rejects.toThrow('Token expired')
+    })).rejects.toMatchError(
+      new AuthError('Token expired', 'TOKEN_EXPIRED')
+    )
   })
 
   test('Invalid QSH', async () => {
@@ -92,7 +124,9 @@ describe('Auth', () => {
 
     await expect(jiraAddon.auth(req, {
       loadCredentials: () => jiraPayload
-    })).rejects.toThrow('Invalid QSH')
+    })).rejects.toMatchError(
+      new AuthError('Invalid QSH', 'INVALID_QSH')
+    )
   })
 
   test('No "qsh" in JWT token provided', async () => {
