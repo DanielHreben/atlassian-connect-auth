@@ -169,4 +169,103 @@ describe('Auth', () => {
     expect(result).toHaveProperty('credentials')
     expect(result).toHaveProperty('payload')
   })
+
+  test('Passed Node.js HTTP request object', async () => {
+    const expectedHash = jwt.createQueryStringHash(
+      {
+        body: jiraPayload,
+        query: {},
+        pathname: '/api/install',
+        method: 'POST'
+      },
+      false,
+      baseUrl
+    )
+
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        sub: 'test:account-id',
+        qsh: expectedHash
+      },
+      jiraPayload.sharedSecret
+    )
+
+    const req = {
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {},
+      pathname: '/api/install',
+      method: 'POST'
+    }
+
+    const result = await jiraAddon.auth(req, {
+      loadCredentials: () => jiraPayload
+    })
+
+    expect(result).toMatchInlineSnapshot(`
+      Object {
+        "credentials": Object {
+          "baseUrl": "https://test.atlassian.net",
+          "clientKey": "jira-client-key",
+          "sharedSecret": "shh-secret-cat",
+        },
+        "payload": Object {
+          "iss": "jira-client-key",
+          "qsh": "308ba56cff8ed9ae4d1a5fde6c4add0c3de1c7bdf6ddcb220a8763711645e298",
+          "sub": "test:account-id",
+        },
+      }
+    `)
+  })
+
+  test('Passed Express request object', async () => {
+    const expectedHash = jwt.createQueryStringHash(
+      {
+        body: jiraPayload,
+        query: {},
+        pathname: '/api/install',
+        method: 'POST'
+      },
+      false,
+      baseUrl
+    )
+
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        sub: 'test:account-id',
+        qsh: expectedHash
+      },
+      jiraPayload.sharedSecret
+    )
+
+    const req = {
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {},
+      pathname: '/install',
+      originalUrl: '/api/install',
+      method: 'POST'
+    }
+
+    const result = await jiraAddon.auth(req, {
+      loadCredentials: () => jiraPayload
+    })
+
+    expect(result).toMatchInlineSnapshot(`
+      Object {
+        "credentials": Object {
+          "baseUrl": "https://test.atlassian.net",
+          "clientKey": "jira-client-key",
+          "sharedSecret": "shh-secret-cat",
+        },
+        "payload": Object {
+          "iss": "jira-client-key",
+          "qsh": "308ba56cff8ed9ae4d1a5fde6c4add0c3de1c7bdf6ddcb220a8763711645e298",
+          "sub": "test:account-id",
+        },
+      }
+    `)
+  })
 })
