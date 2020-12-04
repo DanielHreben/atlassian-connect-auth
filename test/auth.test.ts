@@ -1,83 +1,100 @@
-const jwt = require('atlassian-jwt')
-const { Addon, AuthError } = require('../lib')
+import * as jwt from 'atlassian-jwt';
+import { request } from 'express';
+import { cloneDeep } from 'lodash';
 
-const baseUrl = 'https://test.example.com'
+import { Addon, AuthError } from '../src';
+
+const baseUrl = 'https://test.example.com';
 
 const jiraPayload = {
   baseUrl: 'https://test.atlassian.net',
   clientKey: 'jira-client-key',
-  sharedSecret: 'shh-secret-cat'
-}
+  sharedSecret: 'shh-secret-cat',
+};
 
 const jiraAddon = new Addon({
   product: 'jira',
-  baseUrl
-})
+  baseUrl,
+});
+
+const noop = () => null;
+
+function createReq(props) {
+  return Object.assign(cloneDeep(request), props);
+}
 
 describe('Auth', () => {
   test('Missing token', async () => {
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: {},
-      query: {}
-    }
+      query: {},
+    });
 
-    await expect(jiraAddon.auth(req, {})).rejects.toMatchError(
+    await expect(jiraAddon.auth(req, { loadCredentials: noop })).rejects.toMatchError(
       new AuthError('Missed token', 'MISSED_TOKEN')
-    )
-  })
+    );
+  });
 
   test('Failed to decode token', async () => {
-    const token = 'abc.def.ghi'
+    const token = 'abc.def.ghi';
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
-      query: {}
-    }
+      query: {},
+    });
 
-    await expect(jiraAddon.auth(req, {})).rejects.toMatchError(
+    await expect(jiraAddon.auth(req, { loadCredentials: noop })).rejects.toMatchError(
       new AuthError(
         'Failed to decode token',
         'FAILED_TO_DECODE',
         new SyntaxError('Unexpected token i in JSON at position 0')
       )
-    )
-  })
+    );
+  });
 
   test('Unknown issuer', async () => {
-    const loadCredentials = () => null
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const loadCredentials = () => null;
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+      },
+      jiraPayload.sharedSecret
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
-      query: {}
-    }
+      query: {},
+    });
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials
-    })).rejects.toMatchError(
-      new AuthError('Unknown issuer', 'UNKNOWN_ISSUER')
-    )
-  })
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials,
+      })
+    ).rejects.toMatchError(new AuthError('Unknown issuer', 'UNKNOWN_ISSUER'));
+  });
 
   test('Invalid signature', async () => {
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, 'invalid-shared-secret')
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+      },
+      'invalid-shared-secret'
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
-      query: {}
-    }
+      query: {},
+    });
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })).rejects.toMatchError(
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials: () => jiraPayload,
+      })
+    ).rejects.toMatchError(
       new AuthError(
         'Invalid signature',
         'INVALID_SIGNATURE',
@@ -85,90 +102,102 @@ describe('Auth', () => {
           'Signature verification failed for input: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqaXJhLWNsaWVudC1rZXkifQ with method sha256'
         )
       )
-    )
-  })
+    );
+  });
 
   test('Token expired', async () => {
-    const now = Math.floor(Date.now() / 1000)
+    const now = Math.floor(Date.now() / 1000);
 
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey,
-      exp: now - 1000
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        exp: now - 1000,
+      },
+      jiraPayload.sharedSecret
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
-      query: {}
-    }
+      query: {},
+    });
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })).rejects.toMatchError(
-      new AuthError('Token expired', 'TOKEN_EXPIRED')
-    )
-  })
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials: () => jiraPayload,
+      })
+    ).rejects.toMatchError(new AuthError('Token expired', 'TOKEN_EXPIRED'));
+  });
 
   test('Invalid QSH', async () => {
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey,
-      qsh: 'invalid-qsh'
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        qsh: 'invalid-qsh',
+      },
+      jiraPayload.sharedSecret
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
       query: {},
-      method: 'POST'
-    }
+      method: 'POST',
+    });
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })).rejects.toMatchError(
-      new AuthError('Invalid QSH', 'INVALID_QSH')
-    )
-  })
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials: () => jiraPayload,
+      })
+    ).rejects.toMatchError(new AuthError('Invalid QSH', 'INVALID_QSH'));
+  });
 
   test('No "qsh" in JWT token provided', async () => {
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+      },
+      jiraPayload.sharedSecret
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
       query: {},
-      method: 'POST'
-    }
-
-    const result = await jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })
-
-    expect(result).toHaveProperty('credentials')
-    expect(result).toHaveProperty('payload')
-  })
-
-  test('"skipQsh" passed', async () => {
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
-
-    const req = {
-      body: jiraPayload,
-      headers: { authorization: `JWT ${token}` },
-      query: {},
-      method: 'POST'
-    }
+      method: 'POST',
+    });
 
     const result = await jiraAddon.auth(req, {
       loadCredentials: () => jiraPayload,
-      skipQsh: true
-    })
+    });
 
-    expect(result).toHaveProperty('credentials')
-    expect(result).toHaveProperty('payload')
-  })
+    expect(result).toHaveProperty('credentials');
+    expect(result).toHaveProperty('payload');
+  });
+
+  test('"skipQsh" passed', async () => {
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+      },
+      jiraPayload.sharedSecret
+    );
+
+    const req = createReq({
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {},
+      method: 'POST',
+    });
+
+    const result = await jiraAddon.auth(req, {
+      loadCredentials: () => jiraPayload,
+      skipQsh: true,
+    });
+
+    expect(result).toHaveProperty('credentials');
+    expect(result).toHaveProperty('payload');
+  });
 
   test('Passed Node.js HTTP request object', async () => {
     const expectedHash = jwt.createQueryStringHash(
@@ -176,32 +205,32 @@ describe('Auth', () => {
         body: jiraPayload,
         query: {},
         pathname: '/api/install',
-        method: 'POST'
+        method: 'POST',
       },
       false,
       baseUrl
-    )
+    );
 
     const token = jwt.encode(
       {
         iss: jiraPayload.clientKey,
         sub: 'test:account-id',
-        qsh: expectedHash
+        qsh: expectedHash,
       },
       jiraPayload.sharedSecret
-    )
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
       query: {},
       pathname: '/api/install',
-      method: 'POST'
-    }
+      method: 'POST',
+    });
 
     const result = await jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })
+      loadCredentials: () => jiraPayload,
+    });
 
     expect(result).toMatchInlineSnapshot(`
       Object {
@@ -216,8 +245,8 @@ describe('Auth', () => {
           "sub": "test:account-id",
         },
       }
-    `)
-  })
+    `);
+  });
 
   test('Passed Express request object', async () => {
     const expectedHash = jwt.createQueryStringHash(
@@ -225,33 +254,33 @@ describe('Auth', () => {
         body: jiraPayload,
         query: {},
         pathname: '/api/install',
-        method: 'POST'
+        method: 'POST',
       },
       false,
       baseUrl
-    )
+    );
 
     const token = jwt.encode(
       {
         iss: jiraPayload.clientKey,
         sub: 'test:account-id',
-        qsh: expectedHash
+        qsh: expectedHash,
       },
       jiraPayload.sharedSecret
-    )
+    );
 
-    const req = {
+    const req = createReq({
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
       query: {},
       pathname: '/install',
       originalUrl: '/api/install',
-      method: 'POST'
-    }
+      method: 'POST',
+    });
 
     const result = await jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })
+      loadCredentials: () => jiraPayload,
+    });
 
     expect(result).toMatchInlineSnapshot(`
       Object {
@@ -266,6 +295,6 @@ describe('Auth', () => {
           "sub": "test:account-id",
         },
       }
-    `)
-  })
-})
+    `);
+  });
+});
