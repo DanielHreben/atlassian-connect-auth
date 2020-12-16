@@ -46,7 +46,7 @@ describe('Auth', () => {
   })
 
   test('Unknown issuer', async () => {
-    const loadCredentials = () => null
+    const loadCredentials = jest.fn()
     const token = jwt.encode({
       iss: jiraPayload.clientKey
     }, jiraPayload.sharedSecret)
@@ -62,9 +62,12 @@ describe('Auth', () => {
     })).rejects.toMatchError(
       new AuthError('Unknown issuer', 'UNKNOWN_ISSUER')
     )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('Invalid signature', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
+
     const token = jwt.encode({
       iss: jiraPayload.clientKey
     }, 'invalid-shared-secret')
@@ -75,9 +78,7 @@ describe('Auth', () => {
       query: {}
     }
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })).rejects.toMatchError(
+    await expect(jiraAddon.auth(req, { loadCredentials })).rejects.toMatchError(
       new AuthError(
         'Invalid signature',
         'INVALID_SIGNATURE',
@@ -86,9 +87,11 @@ describe('Auth', () => {
         )
       )
     )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('Token expired', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const now = Math.floor(Date.now() / 1000)
 
     const token = jwt.encode({
@@ -102,14 +105,14 @@ describe('Auth', () => {
       query: {}
     }
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
-    })).rejects.toMatchError(
+    await expect(jiraAddon.auth(req, { loadCredentials })).rejects.toMatchError(
       new AuthError('Token expired', 'TOKEN_EXPIRED')
     )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('Invalid QSH', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const token = jwt.encode({
       iss: jiraPayload.clientKey,
       qsh: 'invalid-qsh'
@@ -123,13 +126,15 @@ describe('Auth', () => {
     }
 
     await expect(jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
+      loadCredentials
     })).rejects.toMatchError(
       new AuthError('Invalid QSH', 'INVALID_QSH')
     )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('No "qsh" in JWT token provided', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const token = jwt.encode({
       iss: jiraPayload.clientKey
     }, jiraPayload.sharedSecret)
@@ -142,14 +147,16 @@ describe('Auth', () => {
     }
 
     const result = await jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload
+      loadCredentials
     })
 
     expect(result).toHaveProperty('credentials')
     expect(result).toHaveProperty('payload')
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('"skipQsh" passed', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const token = jwt.encode({
       iss: jiraPayload.clientKey
     }, jiraPayload.sharedSecret)
@@ -162,12 +169,13 @@ describe('Auth', () => {
     }
 
     const result = await jiraAddon.auth(req, {
-      loadCredentials: () => jiraPayload,
+      loadCredentials,
       skipQsh: true
     })
 
     expect(result).toHaveProperty('credentials')
     expect(result).toHaveProperty('payload')
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('Passed Node.js HTTP request object', async () => {

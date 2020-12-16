@@ -1,15 +1,15 @@
 # atlassian-connect-auth
 
-[![Greenkeeper badge](https://badges.greenkeeper.io/DanielHreben/atlassian-connect-auth.svg)](https://greenkeeper.io/)
+[![Known Vulnerabilities](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth/badge.svg?targetFile=package.json)](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth?targetFile=package.json)
 
 Helper for handling webhooks from Atlassian products
 
 ```javascript
-const {Addon, AuthError} = require('atlassian-connect-auth')
+const { Addon, AuthError } = require('atlassian-connect-auth')
 
 const addon = new Addon({
   baseUrl: 'https://your-addon-url.com',
-  product: 'jira',
+  product: 'jira', // or 'bitbucket'
 })
 
 const handleInstall = (req, res) => {
@@ -59,6 +59,4 @@ const app = express()
   .post('/api/hooks/jira/installed', handleInstall)
   .post('/api/hooks/jira/uninstalled', handleAuth, handleUninstall)
   .post('/api/hooks/jira/project/created', handleAuth, handleProjectCreated)
-
-
 ```
