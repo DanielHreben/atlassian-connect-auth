@@ -11,7 +11,8 @@ const jiraPayload = {
 }
 
 const bitbucketPayload = {
-  principal: { uuid: 'bitbucket-workspace-id' }
+  principal: { uuid: 'bitbucket-workspace-id' },
+  clientKey: 'bitbucket-client-key'
 }
 
 const jiraAddon = new Addon({
@@ -24,10 +25,14 @@ const bitbucketAddon = new Addon({
   baseUrl
 })
 
+beforeEach(() => {
+  saveCredentials.mockReset()
+})
+
 describe('Installation', () => {
   test('First Jira add-on install', async () => {
     const req = { body: jiraPayload, headers: {}, query: {} }
-    const loadCredentials = () => null
+    const loadCredentials = jest.fn()
 
     const result = await jiraAddon.install(req, {
       loadCredentials,
@@ -35,11 +40,13 @@ describe('Installation', () => {
     })
 
     expect(result.credentials).toEqual(jiraPayload)
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).toHaveBeenCalledWith(req.body.clientKey, req.body)
   })
 
   test('First Bitbucket add-on install', async () => {
     const req = { body: bitbucketPayload, headers: {}, query: {} }
-    const loadCredentials = () => null
+    const loadCredentials = jest.fn()
 
     const result = await bitbucketAddon.install(req, {
       loadCredentials,
@@ -47,6 +54,8 @@ describe('Installation', () => {
     })
 
     expect(result.credentials).toEqual(bitbucketPayload)
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).toHaveBeenCalledWith(req.body.clientKey, req.body)
   })
 
   test('Failed to decode token', async () => {
@@ -68,7 +77,7 @@ describe('Installation', () => {
   })
 
   test('Passed different id in body and authorization header', async () => {
-    const loadCredentials = () => null
+    const loadCredentials = jest.fn()
     const token = jwt.encode({
       iss: 'different-id'
     }, jiraPayload.sharedSecret)
@@ -85,10 +94,13 @@ describe('Installation', () => {
     })).rejects.toMatchError(
       new AuthError('Wrong issuer', 'WRONG_ISSUER')
     )
+
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).not.toHaveBeenCalled()
   })
 
   test('Second and subsequent Jira add-on install', async () => {
-    const loadCredentials = () => jiraPayload
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const token = jwt.encode({
       iss: jiraPayload.clientKey
     }, jiraPayload.sharedSecret)
@@ -104,6 +116,8 @@ describe('Installation', () => {
       saveCredentials
     })
 
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).toHaveBeenCalledWith(req.body.clientKey, req.body, jiraPayload)
     expect(result.credentials).toEqual(jiraPayload)
     expect(result.payload).toEqual({
       iss: jiraPayload.clientKey
@@ -111,7 +125,7 @@ describe('Installation', () => {
   })
 
   test('Unauthorized request to updated existing instance', async () => {
-    const loadCredentials = () => jiraPayload
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const req = { body: jiraPayload, headers: {}, query: {} }
 
     await expect(jiraAddon.install(req, {
@@ -120,5 +134,7 @@ describe('Installation', () => {
     })).rejects.toMatchError(
       new AuthError('Unauthorized update request', 'UNAUTHORIZED_REQUEST')
     )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).not.toHaveBeenCalled()
   })
 })
