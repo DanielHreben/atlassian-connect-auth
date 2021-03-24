@@ -12,7 +12,8 @@ const jiraPayload = {
 
 const bitbucketPayload = {
   principal: { uuid: 'bitbucket-workspace-id' },
-  clientKey: 'bitbucket-client-key'
+  clientKey: 'bitbucket-client-key',
+  sharedSecret: 'shh-secret-cat'
 }
 
 const jiraAddon = new Addon({
@@ -78,9 +79,12 @@ describe('Installation', () => {
 
   test('Passed different id in body and authorization header', async () => {
     const loadCredentials = jest.fn()
-    const token = jwt.encode({
-      iss: 'different-id'
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: 'different-id'
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -88,27 +92,101 @@ describe('Installation', () => {
       query: {}
     }
 
-    await expect(jiraAddon.install(req, {
-      loadCredentials,
-      saveCredentials
-    })).rejects.toMatchError(
-      new AuthError('Wrong issuer', 'WRONG_ISSUER')
-    )
+    await expect(
+      jiraAddon.install(req, {
+        loadCredentials,
+        saveCredentials
+      })
+    ).rejects.toMatchError(new AuthError('Wrong issuer', 'WRONG_ISSUER'))
 
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
     expect(saveCredentials).not.toHaveBeenCalled()
   })
 
-  test('Second and subsequent Jira add-on install', async () => {
+  test('Second and subsequent installation of Jira add-on with no qsh', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
       headers: { authorization: `JWT ${token}` },
       query: {}
+    }
+
+    await expect(
+      jiraAddon.install(req, {
+        loadCredentials,
+        saveCredentials
+      })
+    ).rejects.toMatchError(
+      new AuthError(
+        'JWT did not contain the query string hash (qsh) claim',
+        'MISSED_QSH'
+      )
+    )
+  })
+
+  test('Second and subsequent installation of Bitbucket add-on with no qsh', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(bitbucketPayload)
+    const token = jwt.encode(
+      {
+        iss: bitbucketPayload.clientKey
+      },
+      bitbucketPayload.sharedSecret
+    )
+
+    const req = {
+      body: bitbucketPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {}
+    }
+
+    const result = await bitbucketAddon.install(req, {
+      loadCredentials,
+      saveCredentials
+    })
+
+    expect(result.credentials).toEqual(bitbucketPayload)
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+    expect(saveCredentials).toHaveBeenCalledWith(
+      req.body.clientKey,
+      req.body,
+      bitbucketPayload
+    )
+  })
+
+  test('Second and subsequent Jira add-on install', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
+    const expectedHash = jwt.createQueryStringHash(
+      {
+        body: jiraPayload,
+        query: {},
+        pathname: '/api/install',
+        method: 'POST'
+      },
+      false,
+      baseUrl
+    )
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        qsh: expectedHash
+      },
+      jiraPayload.sharedSecret
+    )
+
+    const req = {
+      body: jiraPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {},
+      pathname: '/install',
+      originalUrl: '/api/install',
+      method: 'POST'
     }
 
     const result = await jiraAddon.install(req, {
@@ -117,21 +195,36 @@ describe('Installation', () => {
     })
 
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
-    expect(saveCredentials).toHaveBeenCalledWith(req.body.clientKey, req.body, jiraPayload)
-    expect(result.credentials).toEqual(jiraPayload)
-    expect(result.payload).toEqual({
-      iss: jiraPayload.clientKey
-    })
+    expect(saveCredentials).toHaveBeenCalledWith(
+      req.body.clientKey,
+      req.body,
+      jiraPayload
+    )
+    expect(result).toMatchInlineSnapshot(`
+      Object {
+        "credentials": Object {
+          "baseUrl": "https://test.atlassian.net",
+          "clientKey": "jira-client-key",
+          "sharedSecret": "shh-secret-cat",
+        },
+        "payload": Object {
+          "iss": "jira-client-key",
+          "qsh": "308ba56cff8ed9ae4d1a5fde6c4add0c3de1c7bdf6ddcb220a8763711645e298",
+        },
+      }
+    `)
   })
 
   test('Unauthorized request to updated existing instance', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const req = { body: jiraPayload, headers: {}, query: {} }
 
-    await expect(jiraAddon.install(req, {
-      loadCredentials,
-      saveCredentials
-    })).rejects.toMatchError(
+    await expect(
+      jiraAddon.install(req, {
+        loadCredentials,
+        saveCredentials
+      })
+    ).rejects.toMatchError(
       new AuthError('Unauthorized update request', 'UNAUTHORIZED_REQUEST')
     )
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
