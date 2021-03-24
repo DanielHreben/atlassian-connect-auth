@@ -9,7 +9,7 @@ const { Addon, AuthError } = require('atlassian-connect-auth')
 
 const addon = new Addon({
   baseUrl: 'https://your-addon-url.com',
-  product: 'jira', // or 'bitbucket'
+  product: 'jira', // ('jira', 'confluence', or 'bitbucket')
 })
 
 const handleInstall = (req, res) => {
