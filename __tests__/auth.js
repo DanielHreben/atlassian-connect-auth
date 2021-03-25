@@ -9,8 +9,19 @@ const jiraPayload = {
   sharedSecret: 'shh-secret-cat'
 }
 
+const bitbucketPayload = {
+  principal: { uuid: 'bitbucket-workspace-id' },
+  clientKey: 'bitbucket-client-key',
+  sharedSecret: 'shh-secret-cat'
+}
+
 const jiraAddon = new Addon({
   product: 'jira',
+  baseUrl
+})
+
+const bitbucketAddon = new Addon({
+  product: 'bitbucket',
   baseUrl
 })
 
@@ -146,7 +157,28 @@ describe('Auth', () => {
       method: 'POST'
     }
 
-    const result = await jiraAddon.auth(req, {
+    await expect(jiraAddon.auth(req, {
+      loadCredentials
+    })).rejects.toMatchError(
+      new AuthError('JWT did not contain the query string hash (qsh) claim', 'MISSED_QSH')
+    )
+    expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
+  })
+
+  test('No "qsh" in JWT token provided for Bitbucket add-on', async () => {
+    const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
+    const token = jwt.encode({
+      iss: bitbucketPayload.clientKey
+    }, bitbucketPayload.sharedSecret)
+
+    const req = {
+      body: bitbucketPayload,
+      headers: { authorization: `JWT ${token}` },
+      query: {},
+      method: 'POST'
+    }
+
+    const result = await bitbucketAddon.auth(req, {
       loadCredentials
     })
 
