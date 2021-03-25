@@ -58,9 +58,12 @@ describe('Auth', () => {
 
   test('Unknown issuer', async () => {
     const loadCredentials = jest.fn()
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -68,20 +71,23 @@ describe('Auth', () => {
       query: {}
     }
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials
-    })).rejects.toMatchError(
-      new AuthError('Unknown issuer', 'UNKNOWN_ISSUER')
-    )
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials
+      })
+    ).rejects.toMatchError(new AuthError('Unknown issuer', 'UNKNOWN_ISSUER'))
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('Invalid signature', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
 
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, 'invalid-shared-secret')
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey
+      },
+      'invalid-shared-secret'
+    )
 
     const req = {
       body: jiraPayload,
@@ -105,10 +111,13 @@ describe('Auth', () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const now = Math.floor(Date.now() / 1000)
 
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey,
-      exp: now - 1000
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        exp: now - 1000
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -124,10 +133,13 @@ describe('Auth', () => {
 
   test('Invalid QSH', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey,
-      qsh: 'invalid-qsh'
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        qsh: 'invalid-qsh'
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -136,19 +148,22 @@ describe('Auth', () => {
       method: 'POST'
     }
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials
-    })).rejects.toMatchError(
-      new AuthError('Invalid QSH', 'INVALID_QSH')
-    )
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials
+      })
+    ).rejects.toMatchError(new AuthError('Invalid QSH', 'INVALID_QSH'))
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('No "qsh" in JWT token provided', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -157,19 +172,27 @@ describe('Auth', () => {
       method: 'POST'
     }
 
-    await expect(jiraAddon.auth(req, {
-      loadCredentials
-    })).rejects.toMatchError(
-      new AuthError('JWT did not contain the query string hash (qsh) claim', 'MISSED_QSH')
+    await expect(
+      jiraAddon.auth(req, {
+        loadCredentials
+      })
+    ).rejects.toMatchError(
+      new AuthError(
+        'JWT did not contain the query string hash (qsh) claim',
+        'MISSED_QSH'
+      )
     )
     expect(loadCredentials).toHaveBeenCalledWith(req.body.clientKey)
   })
 
   test('No "qsh" in JWT token provided for Bitbucket add-on', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode({
-      iss: bitbucketPayload.clientKey
-    }, bitbucketPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: bitbucketPayload.clientKey
+      },
+      bitbucketPayload.sharedSecret
+    )
 
     const req = {
       body: bitbucketPayload,
@@ -189,9 +212,12 @@ describe('Auth', () => {
 
   test('"skipQsh" passed', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode({
-      iss: jiraPayload.clientKey
-    }, jiraPayload.sharedSecret)
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey
+      },
+      jiraPayload.sharedSecret
+    )
 
     const req = {
       body: jiraPayload,
@@ -303,6 +329,45 @@ describe('Auth', () => {
         "payload": Object {
           "iss": "jira-client-key",
           "qsh": "308ba56cff8ed9ae4d1a5fde6c4add0c3de1c7bdf6ddcb220a8763711645e298",
+          "sub": "test:account-id",
+        },
+      }
+    `)
+  })
+
+  test('Extract token from a custom place', async () => {
+    const token = jwt.encode(
+      {
+        iss: jiraPayload.clientKey,
+        sub: 'test:account-id'
+      },
+      jiraPayload.sharedSecret
+    )
+
+    const req = {
+      headers: {},
+      body: jiraPayload,
+      query: { state: `JWT ${token}` },
+      pathname: '/account',
+      originalUrl: '/api/account',
+      method: 'POST'
+    }
+
+    const result = await jiraAddon.auth(req, {
+      loadCredentials: () => jiraPayload,
+      customExtractToken: () => req.query.state,
+      skipQsh: true
+    })
+
+    expect(result).toMatchInlineSnapshot(`
+      Object {
+        "credentials": Object {
+          "baseUrl": "https://test.atlassian.net",
+          "clientKey": "jira-client-key",
+          "sharedSecret": "shh-secret-cat",
+        },
+        "payload": Object {
+          "iss": "jira-client-key",
           "sub": "test:account-id",
         },
       }
