@@ -1,0 +1,4 @@
+.github
+.eslint*
+.prettierrc
+coverage
