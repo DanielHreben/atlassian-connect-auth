@@ -79,7 +79,7 @@ describe('Installation', () => {
 
   test('Passed different id in body and authorization header', async () => {
     const loadCredentials = jest.fn()
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: 'different-id'
       },
@@ -105,7 +105,7 @@ describe('Installation', () => {
 
   test('Second and subsequent installation of Jira add-on with no qsh', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey
       },
@@ -133,7 +133,7 @@ describe('Installation', () => {
 
   test('Second and subsequent installation of Bitbucket add-on with no qsh', async () => {
     const loadCredentials = jest.fn().mockReturnValue(bitbucketPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: bitbucketPayload.clientKey
       },
@@ -172,7 +172,7 @@ describe('Installation', () => {
       false,
       baseUrl
     )
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         qsh: expectedHash

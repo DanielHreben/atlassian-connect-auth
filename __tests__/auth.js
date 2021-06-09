@@ -58,7 +58,7 @@ describe('Auth', () => {
 
   test('Unknown issuer', async () => {
     const loadCredentials = jest.fn()
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey
       },
@@ -82,7 +82,7 @@ describe('Auth', () => {
   test('Invalid signature', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
 
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey
       },
@@ -111,7 +111,7 @@ describe('Auth', () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
     const now = Math.floor(Date.now() / 1000)
 
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         exp: now - 1000
@@ -133,7 +133,7 @@ describe('Auth', () => {
 
   test('Invalid QSH', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         qsh: 'invalid-qsh'
@@ -158,7 +158,7 @@ describe('Auth', () => {
 
   test('No "qsh" in JWT token provided', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey
       },
@@ -187,7 +187,7 @@ describe('Auth', () => {
 
   test('No "qsh" in JWT token provided for Bitbucket add-on', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: bitbucketPayload.clientKey
       },
@@ -212,7 +212,7 @@ describe('Auth', () => {
 
   test('"skipQsh" passed', async () => {
     const loadCredentials = jest.fn().mockReturnValue(jiraPayload)
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey
       },
@@ -248,7 +248,7 @@ describe('Auth', () => {
       baseUrl
     )
 
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         sub: 'test:account-id',
@@ -297,7 +297,7 @@ describe('Auth', () => {
       baseUrl
     )
 
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         sub: 'test:account-id',
@@ -336,7 +336,7 @@ describe('Auth', () => {
   })
 
   test('Extract token from a custom place', async () => {
-    const token = jwt.encode(
+    const token = jwt.encodeSymmetric(
       {
         iss: jiraPayload.clientKey,
         sub: 'test:account-id'
