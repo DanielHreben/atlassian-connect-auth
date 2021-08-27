@@ -1,9 +1,5 @@
 export class AuthError extends Error {
-  constructor(
-    public message: string,
-    public code: AuthErrorCodes,
-    public originError?: unknown | Error
-  ) {
+  constructor(message: string, public code: AuthErrorCodes, public originError?: unknown | Error) {
     super(message);
   }
 }
