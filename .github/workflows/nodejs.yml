@@ -1,27 +1,23 @@
-name: Node CI
+name: Tests & Checks
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x]
-
+        node-version: ['12', '14', '16']
+    name: Node ${{ matrix.node-version }}
+    env:
+      CI: true
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
       with:
         node-version: ${{ matrix.node-version }}
-    - name: npm install, build, and test
-      run: |
-        npm ci
-        npm run build
-        npm test
-        npm run lint
-      env:
-        CI: true
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run build
+    - run: npm test -- --ci
+    - run: npm run lint

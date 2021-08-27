@@ -1,4 +1,4 @@
-name: Node.js Package
+name: Release
 
 on:
   release:
@@ -7,24 +7,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CI: true
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
         with:
-          node-version: 14
+          node-version: '16'
+          cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - run: npm test
+      - run: npm test -- --ci
 
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      CI: true
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-node@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
         with:
-          node-version: 14
-          registry-url: https://registry.npmjs.org/
+          node-version: '16'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org/'
       - run: npm ci
       - run: npm run build
       # Skip for now
