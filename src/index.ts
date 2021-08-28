@@ -1,3 +1,5 @@
-export { Addon } from './Addon';
-export { AuthError, AuthErrorCodes } from './AuthError';
+export * from './AuthError';
+export * from './ConnectApp';
+export * from './Jwt';
+export * from './requestReader';
 export * from './types';

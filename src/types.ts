@@ -1,11 +1,33 @@
-export { Request as ExpressRequest } from 'express';
+type JSONValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | JSONValue[]
+  | { [key: string]: JSONValue };
+type Timestamp = number;
 
-export enum Products {
-  jira = 'jira',
-  confluence = 'confluence',
-  bitbucket = 'bitbucket',
+export const ContextQsh = 'context-qsh';
+
+export interface Credentials {
+  sharedSecret: string;
 }
 
-export type TokenPayload = Record<string, unknown>;
+export interface ConnectJwt {
+  sub: string;
+  qsh?: typeof ContextQsh;
+  iss: string; // clientKey
+  exp: Timestamp;
+  iat: Timestamp;
+  context: JSONValue;
+  [key: string]: JSONValue;
+}
 
-export type CustomTokenExtractor = () => string | undefined;
+export interface ConnectSignedInstallationJwt {
+  sub: string;
+  iss: string;
+  aud: string; // app's baseUrl
+  exp: Timestamp;
+  iat: Timestamp;
+}
