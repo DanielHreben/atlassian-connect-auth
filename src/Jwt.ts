@@ -3,21 +3,6 @@ import * as atlassianJwt from 'atlassian-jwt';
 import { AuthError, AuthErrorCode } from './AuthError';
 import { ConnectJwt, Credentials } from './types';
 
-export function decodeUnverifiedConnectJwtWithoutError(
-  rawConnectJwt: string
-): ConnectJwt | undefined {
-  try {
-    return atlassianJwt.decodeSymmetric(
-      rawConnectJwt,
-      '',
-      atlassianJwt.SymmetricAlgorithm.HS256,
-      true
-    );
-  } catch (error) {
-    return undefined;
-  }
-}
-
 export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
   try {
     return atlassianJwt.decodeSymmetric(
@@ -37,9 +22,11 @@ export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
 export function verifyConnectJwt({
   rawConnectJwt,
   credentials: { sharedSecret },
+  unverifiedConnectJwt,
 }: {
   rawConnectJwt: string;
   credentials: Credentials;
+  unverifiedConnectJwt?: ConnectJwt;
 }): ConnectJwt {
   let connectJwt;
 
@@ -53,7 +40,7 @@ export function verifyConnectJwt({
     throw new AuthError('Invalid signature', {
       code: AuthErrorCode.INVALID_SIGNATURE,
       originError: error,
-      unverifiedConnectJwt: decodeUnverifiedConnectJwtWithoutError(connectJwt),
+      unverifiedConnectJwt,
     });
   }
 
@@ -62,7 +49,7 @@ export function verifyConnectJwt({
   if (connectJwt.exp && now > connectJwt.exp) {
     throw new AuthError('Token expired', {
       code: AuthErrorCode.TOKEN_EXPIRED,
-      unverifiedConnectJwt: decodeUnverifiedConnectJwtWithoutError(connectJwt),
+      unverifiedConnectJwt: connectJwt,
     });
   }
 
@@ -79,10 +66,12 @@ export function verifyQueryStringHash({
   if (connectJwt.qsh !== requestComputedQsh) {
     throw new AuthError('Invalid QSH', {
       code: AuthErrorCode.INVALID_QSH,
+
       qshInfo: {
-        computed: requestComputedQsh || 'empty',
-        received: connectJwt.qsh || 'empty',
+        computed: requestComputedQsh || /* istanbul ignore next: ignore fallback */ 'empty',
+        received: connectJwt?.qsh || /* istanbul ignore next: ignore fallback */ 'empty',
       },
+      connectJwt,
     });
   }
 }

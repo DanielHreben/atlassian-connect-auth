@@ -22,18 +22,18 @@ export interface VerifyInstallArgs<C> {
   loadCredentials: CredentialsLoader<C>;
 }
 
-export enum InstallResponseCode {
+export enum InstallType {
   newInstall = 'newInstall',
   update = 'update',
 }
 
 export interface VerifyInstallNewResponse {
-  type: InstallResponseCode.newInstall;
+  type: InstallType.newInstall;
   clientKey: string;
 }
 
 export interface VerifyInstallUpdateResponse<C> {
-  type: InstallResponseCode.update;
+  type: InstallType.update;
   clientKey: string;
   connectJwt: ConnectJwt;
   context: C;
@@ -44,7 +44,7 @@ export type VerifyInstallResponse<C> = VerifyInstallNewResponse | VerifyInstallU
 export interface VerifyRequestArgs<C> {
   requestReader: RequestReader;
   loadCredentials: CredentialsLoader<C>;
-  useContextJwt: boolean;
+  useContextJwt?: boolean;
 }
 
 export interface VerifyRequestResponse<C> {
@@ -75,8 +75,9 @@ export class ConnectApp {
 
     // Check issuer
     const rawConnectJwt = requestReader.extractConnectJwt();
+    let unverifiedConnectJwt;
     if (rawConnectJwt) {
-      const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
+      unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
       if (unverifiedConnectJwt.iss !== clientKey) {
         throw new AuthError('Wrong issuer', {
           code: AuthErrorCode.WRONG_ISSUER,
@@ -89,53 +90,50 @@ export class ConnectApp {
     const credentials = await loadCredentials(clientKey);
     if (!credentials) {
       return {
-        type: InstallResponseCode.newInstall,
+        type: InstallType.newInstall,
         clientKey,
       };
     }
 
     // Check installation update
-    if (credentials && rawConnectJwt) {
-      const connectJwt = verifyConnectJwt({ rawConnectJwt, credentials });
+    if (rawConnectJwt) {
+      const connectJwt = verifyConnectJwt({ rawConnectJwt, credentials, unverifiedConnectJwt });
 
       if (this.checkQueryStringHashOnInstall) {
         this.verifyQsh(connectJwt, requestReader, false);
       }
 
       return {
-        type: InstallResponseCode.update,
+        type: InstallType.update,
         clientKey,
         connectJwt,
         context: credentials.context,
       };
     }
 
-    const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
     throw new AuthError('Unauthorized update request', {
       code: AuthErrorCode.UNAUTHORIZED_REQUEST,
-      unverifiedConnectJwt,
     });
   }
 
   async verifyRequest<C>({
     requestReader,
     loadCredentials,
-    useContextJwt,
+    useContextJwt = false,
   }: VerifyRequestArgs<C>): Promise<VerifyRequestResponse<C>> {
     const rawConnectJwt = requestReader.extractConnectJwt();
-
     if (!rawConnectJwt) {
       throw new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT });
     }
 
-    const clientKey = requestReader.extractClientKey();
-    const credentials = await loadCredentials(clientKey);
-
+    // Load existing installation
+    const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
+    const credentials = await loadCredentials(unverifiedConnectJwt.iss);
     if (!credentials) {
       throw new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER });
     }
 
-    const connectJwt = verifyConnectJwt({ rawConnectJwt, credentials });
+    const connectJwt = verifyConnectJwt({ rawConnectJwt, credentials, unverifiedConnectJwt });
 
     if (this.checkQueryStringHashOnRequest) {
       this.verifyQsh(connectJwt, requestReader, useContextJwt);
@@ -148,6 +146,7 @@ export class ConnectApp {
     if (!connectJwt.qsh) {
       throw new AuthError('JWT did not contain the query string hash (qsh) claim', {
         code: AuthErrorCode.MISSING_QSH,
+        connectJwt,
       });
     }
 

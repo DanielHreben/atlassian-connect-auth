@@ -7,7 +7,7 @@ export class ExpressRequestReader implements RequestReader {
   constructor(public req: ExpressRequest) {}
 
   extractConnectJwt(): string {
-    const token = (this.req.headers.authorization || this.req.query.jwt || '') as string;
+    const token = (this.req.headers?.authorization || this.req.query?.jwt || '') as string;
     return token.replace(/^JWT /, '');
   }
 
