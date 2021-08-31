@@ -1,7 +1,7 @@
 import { AuthError, AuthErrorCode } from './AuthError';
 import { decodeUnverifiedConnectJwt, verifyConnectJwt, verifyQueryStringHash } from './Jwt';
 import { RequestReader } from './requestReader';
-import { ConnectJwt, ContextQsh, Credentials } from './types';
+import { ConnectCredentials, ConnectJwt, ContextQsh } from './types';
 
 export interface AddonOptions {
   baseUrl: string;
@@ -9,7 +9,7 @@ export interface AddonOptions {
   checkQueryStringHashOnRequest: boolean;
 }
 
-export interface CredentialsWithContext<C> extends Credentials {
+export interface CredentialsWithContext<C> extends ConnectCredentials {
   context: C;
 }
 

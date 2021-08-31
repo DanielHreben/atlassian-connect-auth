@@ -1,7 +1,7 @@
 import * as atlassianJwt from 'atlassian-jwt';
 
 import { AuthError, AuthErrorCode } from './AuthError';
-import { ConnectJwt, Credentials } from './types';
+import { ConnectCredentials, ConnectJwt } from './types';
 
 export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
   try {
@@ -25,7 +25,7 @@ export function verifyConnectJwt({
   unverifiedConnectJwt,
 }: {
   rawConnectJwt: string;
-  credentials: Credentials;
+  credentials: ConnectCredentials;
   unverifiedConnectJwt?: ConnectJwt;
 }): ConnectJwt {
   let connectJwt;

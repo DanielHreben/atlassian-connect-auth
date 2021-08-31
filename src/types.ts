@@ -10,7 +10,7 @@ type Timestamp = number;
 
 export const ContextQsh = 'context-qsh';
 
-export interface Credentials {
+export interface ConnectCredentials {
   sharedSecret: string;
 }
 
@@ -18,16 +18,9 @@ export interface ConnectJwt {
   sub: string;
   qsh?: typeof ContextQsh;
   iss: string; // clientKey
+  aud: string; // app's baseUrl
   exp: Timestamp;
   iat: Timestamp;
   context: JSONValue;
   [key: string]: JSONValue;
-}
-
-export interface ConnectSignedInstallationJwt {
-  sub: string;
-  iss: string;
-  aud: string; // app's baseUrl
-  exp: Timestamp;
-  iat: Timestamp;
 }

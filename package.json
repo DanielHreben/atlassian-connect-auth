@@ -2,13 +2,10 @@
   "name": "atlassian-connect-auth",
   "version": "2.2.0",
   "description": "Helper for handling webhooks from Atlassian products",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "directories": {
-    "lib": "dist"
-  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "rm -rf ./dist; tsc",
+    "build": "rm -rf ./dist && tsc",
     "test": "jest",
     "lint": "eslint ."
   },
