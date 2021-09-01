@@ -6,19 +6,19 @@ import { TestRequestReader } from './helpers/util';
 const baseUrl = 'https://test.example.com';
 const jiraClientKey = 'jira-client-key';
 const bitbucketClientKey = 'bitbucket-client-key';
-const context = { appSpecificId: 1 };
+const entity = { appSpecificId: 1 };
 
 const jiraPayload = {
   baseUrl: 'https://test.atlassian.net',
   clientKey: jiraClientKey,
   sharedSecret: 'shh-secret-cat',
-  context,
+  entity,
 };
 const bitbucketPayload = {
   principal: { uuid: 'bitbucket-workspace-id' },
   clientKey: bitbucketClientKey,
   sharedSecret: 'shh-secret-cat',
-  context,
+  entity,
 };
 
 const jiraApp = new ConnectApp({
@@ -189,7 +189,7 @@ describe('ConnectApp.verifyRequest', () => {
 
     expect(result).toStrictEqual({
       connectJwt: jwtContent,
-      context,
+      entity,
     });
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });
@@ -213,7 +213,7 @@ describe('ConnectApp.verifyRequest', () => {
 
     expect(result).toStrictEqual({
       connectJwt: jwtContent,
-      context,
+      entity,
     });
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });

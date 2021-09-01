@@ -9,17 +9,17 @@ export interface AddonOptions {
   checkQueryStringHashOnRequest: boolean;
 }
 
-export interface CredentialsWithContext<C> extends ConnectCredentials {
-  context: C;
+export interface CredentialsWithEntity<E> extends ConnectCredentials {
+  entity: E;
 }
 
-export interface CredentialsLoader<C> {
-  (clientKey: string): Promise<CredentialsWithContext<C> | undefined>;
+export interface CredentialsLoader<E> {
+  (clientKey: string): Promise<CredentialsWithEntity<E> | undefined>;
 }
 
-export interface VerifyInstallArgs<C> {
+export interface VerifyInstallArgs<E> {
   requestReader: RequestReader;
-  loadCredentials: CredentialsLoader<C>;
+  loadCredentials: CredentialsLoader<E>;
 }
 
 export enum InstallType {
@@ -32,24 +32,24 @@ export interface VerifyInstallNewResponse {
   clientKey: string;
 }
 
-export interface VerifyInstallUpdateResponse<C> {
+export interface VerifyInstallUpdateResponse<E> {
   type: InstallType.update;
   clientKey: string;
   connectJwt: ConnectJwt;
-  context: C;
+  entity: E;
 }
 
-export type VerifyInstallResponse<C> = VerifyInstallNewResponse | VerifyInstallUpdateResponse<C>;
+export type VerifyInstallResponse<E> = VerifyInstallNewResponse | VerifyInstallUpdateResponse<E>;
 
-export interface VerifyRequestArgs<C> {
+export interface VerifyRequestArgs<E> {
   requestReader: RequestReader;
-  loadCredentials: CredentialsLoader<C>;
+  loadCredentials: CredentialsLoader<E>;
   useContextJwt?: boolean;
 }
 
-export interface VerifyRequestResponse<C> {
+export interface VerifyRequestResponse<E> {
   connectJwt: ConnectJwt;
-  context: C;
+  entity: E;
 }
 
 export class ConnectApp {
@@ -67,10 +67,10 @@ export class ConnectApp {
     this.checkQueryStringHashOnRequest = checkQueryStringHashOnRequest;
   }
 
-  async verifyInstall<C>({
+  async verifyInstall<E>({
     requestReader,
     loadCredentials,
-  }: VerifyInstallArgs<C>): Promise<VerifyInstallResponse<C>> {
+  }: VerifyInstallArgs<E>): Promise<VerifyInstallResponse<E>> {
     const clientKey = requestReader.extractClientKey();
 
     // Check issuer
@@ -107,7 +107,7 @@ export class ConnectApp {
         type: InstallType.update,
         clientKey,
         connectJwt,
-        context: credentials.context,
+        entity: credentials.entity,
       };
     }
 
@@ -116,11 +116,11 @@ export class ConnectApp {
     });
   }
 
-  async verifyRequest<C>({
+  async verifyRequest<E>({
     requestReader,
     loadCredentials,
     useContextJwt = false,
-  }: VerifyRequestArgs<C>): Promise<VerifyRequestResponse<C>> {
+  }: VerifyRequestArgs<E>): Promise<VerifyRequestResponse<E>> {
     const rawConnectJwt = requestReader.extractConnectJwt();
     if (!rawConnectJwt) {
       throw new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT });
@@ -139,7 +139,7 @@ export class ConnectApp {
       this.verifyQsh(connectJwt, requestReader, useContextJwt);
     }
 
-    return { connectJwt, context: credentials.context };
+    return { connectJwt, entity: credentials.entity };
   }
 
   private verifyQsh(connectJwt: ConnectJwt, requestReader: RequestReader, useContextJwt: boolean) {

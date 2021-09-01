@@ -1,11 +1,3 @@
-type JSONValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | JSONValue[]
-  | { [key: string]: JSONValue };
 type Timestamp = number;
 
 export const ContextQsh = 'context-qsh';
@@ -16,11 +8,11 @@ export interface ConnectCredentials {
 
 export interface ConnectJwt {
   sub: string;
-  qsh?: typeof ContextQsh;
+  qsh?: string | typeof ContextQsh;
   iss: string; // clientKey
   aud: string; // app's baseUrl
   exp: Timestamp;
   iat: Timestamp;
-  context: JSONValue;
-  [key: string]: JSONValue;
+  context: unknown;
+  [key: string]: unknown;
 }

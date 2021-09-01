@@ -69,7 +69,7 @@ export function verifyQueryStringHash({
 
       qshInfo: {
         computed: requestComputedQsh || /* istanbul ignore next: ignore fallback */ 'empty',
-        received: connectJwt?.qsh || /* istanbul ignore next: ignore fallback */ 'empty',
+        received: connectJwt.qsh || /* istanbul ignore next: ignore fallback */ 'empty',
       },
       connectJwt,
     });
