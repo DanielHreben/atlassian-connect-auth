@@ -1,3 +1,33 @@
 {
-    "extends": ["standard", "plugin:jest/recommended"]
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["simple-import-sort", "jest"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:node/recommended",
+    "plugin:jest/recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "rules": {
+    "node/no-unpublished-import": "off",
+    "node/no-missing-import": [
+      "error",
+      {
+        "tryExtensions": [".js", ".ts", ".d.ts"]
+      }
+    ],
+    "node/no-unsupported-features/es-syntax": "off",
+    "jest/no-restricted-matchers": [
+      "warn",
+      {
+        "toThrow": "Use .toMatchError() instead of .toThrow()",
+        "toThrowError": "Use .toMatchError() instead of .toThrowError()"
+      }
+    ],
+    "no-console": "error",
+    "no-duplicate-imports": "error",
+    "simple-import-sort/imports": "error",
+    "simple-import-sort/exports": "error"
+  }
 }

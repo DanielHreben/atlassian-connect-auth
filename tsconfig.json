@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "target": "es2019",
+    "module": "commonjs",
+    "allowJs": false,
+    "strict": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "noUnusedLocals": true,
+    "resolveJsonModule": true,
+    "outDir": "./dist",
+    "types": ["jest-matcher-specific-error"],
+  },
+  "include": ["./src"]
+}
