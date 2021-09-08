@@ -1,40 +1,33 @@
 import * as atlassianJwt from 'atlassian-jwt';
 
-import { AuthError, AuthErrorCode, ConnectApp, ConnectJwt } from '../src';
+import { AuthError, AuthErrorCode, ConnectAuth, ConnectJwt } from '../src';
 import { TestRequestReader } from './helpers/util';
 
 const baseUrl = 'https://test.example.com';
 const jiraClientKey = 'jira-client-key';
 const bitbucketClientKey = 'bitbucket-client-key';
-const entity = { appSpecificId: 1 };
+const storedEntity = { appSpecificId: 1 };
 
 const jiraPayload = {
   baseUrl: 'https://test.atlassian.net',
   clientKey: jiraClientKey,
   sharedSecret: 'shh-secret-cat',
-  entity,
+  storedEntity,
 };
+
 const bitbucketPayload = {
   principal: { uuid: 'bitbucket-workspace-id' },
   clientKey: bitbucketClientKey,
   sharedSecret: 'shh-secret-cat',
-  entity,
+  storedEntity,
 };
 
-const jiraApp = new ConnectApp({
-  baseUrl,
-  checkQueryStringHashOnInstall: true,
-  checkQueryStringHashOnRequest: true,
-});
-const bitbucketApp = new ConnectApp({
-  baseUrl,
-  checkQueryStringHashOnInstall: false,
-  checkQueryStringHashOnRequest: false,
-});
+describe('ConnectAuth.verifyRequest', () => {
+  const loadCredentials = jest.fn();
 
-describe('ConnectApp.verifyRequest', () => {
+  beforeEach(() => jest.clearAllMocks());
+
   test('Missing token', async () => {
-    const loadCredentials = jest.fn();
     const clientKey = jiraClientKey;
     const requestReader = new TestRequestReader({
       qsh: '',
@@ -42,13 +35,12 @@ describe('ConnectApp.verifyRequest', () => {
       jwt: '',
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
-      new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT })
-    );
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT }));
   });
 
   test('Failed to decode token', async () => {
-    const loadCredentials = jest.fn();
     const clientKey = jiraClientKey;
     const requestReader = new TestRequestReader({
       qsh: '',
@@ -56,7 +48,9 @@ describe('ConnectApp.verifyRequest', () => {
       jwt: 'abc.def.ghi',
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(
       new AuthError('Failed to decode token', {
         code: AuthErrorCode.FAILED_TO_DECODE,
         originError: new SyntaxError('Unexpected token i in JSON at position 0'),
@@ -65,7 +59,6 @@ describe('ConnectApp.verifyRequest', () => {
   });
 
   test('Unknown issuer', async () => {
-    const loadCredentials = jest.fn();
     const clientKey = jiraClientKey;
     const jwtContent = { iss: clientKey };
     const jwt = atlassianJwt.encodeSymmetric(jwtContent, jiraPayload.sharedSecret);
@@ -75,14 +68,14 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
-      new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER })
-    );
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER }));
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });
 
   test('Invalid signature', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(jiraPayload);
+    loadCredentials.mockReturnValue(jiraPayload);
     const clientKey = jiraClientKey;
     const jwtContent = { iss: clientKey } as unknown as ConnectJwt;
     const jwt = atlassianJwt.encodeSymmetric(jwtContent, 'invalid-shared-secret');
@@ -92,7 +85,9 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(
       new AuthError('Invalid signature', {
         code: AuthErrorCode.INVALID_SIGNATURE,
         originError: new Error(
@@ -105,7 +100,7 @@ describe('ConnectApp.verifyRequest', () => {
   });
 
   test('Token expired', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(jiraPayload);
+    loadCredentials.mockReturnValue(jiraPayload);
     const now = Math.floor(Date.now() / 1000);
     const clientKey = jiraClientKey;
     const jwtContent = {
@@ -119,7 +114,9 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(
       new AuthError('Token expired', {
         code: AuthErrorCode.TOKEN_EXPIRED,
         unverifiedConnectJwt: jwtContent,
@@ -129,7 +126,7 @@ describe('ConnectApp.verifyRequest', () => {
   });
 
   test('Invalid QSH', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(jiraPayload);
+    loadCredentials.mockReturnValue(jiraPayload);
     const clientKey = jiraClientKey;
     const jwtContent = {
       iss: clientKey,
@@ -142,7 +139,9 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(
       new AuthError('Invalid QSH', {
         code: AuthErrorCode.INVALID_QSH,
         qshInfo: { computed: 'valid-qsh', received: 'invalid-qsh' },
@@ -153,7 +152,7 @@ describe('ConnectApp.verifyRequest', () => {
   });
 
   test('No QSH in JWT token provided', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(jiraPayload);
+    loadCredentials.mockReturnValue(jiraPayload);
     const clientKey = jiraClientKey;
     const jwtContent = {
       iss: jiraPayload.clientKey,
@@ -165,7 +164,9 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    await expect(jiraApp.verifyRequest({ requestReader, loadCredentials })).rejects.toMatchError(
+    await expect(
+      ConnectAuth.verifyRequest({ baseUrl, requestReader, loadCredentials })
+    ).rejects.toMatchError(
       new AuthError('JWT did not contain the query string hash (qsh) claim', {
         code: AuthErrorCode.MISSING_QSH,
         connectJwt: jwtContent,
@@ -174,8 +175,8 @@ describe('ConnectApp.verifyRequest', () => {
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });
 
-  test('No QSH in JWT token provided for Bitbucket add-on', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(bitbucketPayload);
+  test('No QSH in JWT token provided but QSH check is skipped', async () => {
+    loadCredentials.mockReturnValue(bitbucketPayload);
     const clientKey = bitbucketClientKey;
     const jwtContent = { iss: clientKey };
     const jwt = atlassianJwt.encodeSymmetric(jwtContent, bitbucketPayload.sharedSecret);
@@ -185,17 +186,22 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    const result = await bitbucketApp.verifyRequest({ requestReader, loadCredentials });
+    const result = await ConnectAuth.verifyRequest({
+      baseUrl,
+      requestReader,
+      loadCredentials,
+      skipQueryStringHashCheck: true,
+    });
 
     expect(result).toStrictEqual({
       connectJwt: jwtContent,
-      entity,
+      storedEntity,
     });
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });
 
   test('Context QSH', async () => {
-    const loadCredentials = jest.fn().mockReturnValue(jiraPayload);
+    loadCredentials.mockReturnValue(jiraPayload);
     const clientKey = jiraClientKey;
     const jwtContent = { iss: clientKey, qsh: 'context-qsh' };
     const jwt = atlassianJwt.encodeSymmetric(jwtContent, jiraPayload.sharedSecret);
@@ -205,7 +211,8 @@ describe('ConnectApp.verifyRequest', () => {
       jwt,
     });
 
-    const result = await jiraApp.verifyRequest({
+    const result = await ConnectAuth.verifyRequest({
+      baseUrl,
       requestReader,
       loadCredentials,
       useContextJwt: true,
@@ -213,7 +220,7 @@ describe('ConnectApp.verifyRequest', () => {
 
     expect(result).toStrictEqual({
       connectJwt: jwtContent,
-      entity,
+      storedEntity,
     });
     expect(loadCredentials).toHaveBeenCalledWith(clientKey);
   });

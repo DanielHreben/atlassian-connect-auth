@@ -1,10 +1,8 @@
 import { ConnectJwt } from './types';
 
-export interface InvalidQshInfo {
-  computed: string;
-  received: string;
-}
-
+/**
+ * Types of possible Validation errors.
+ */
 export enum AuthErrorCode {
   MISSING_JWT = 'MISSING_JWT',
   UNAUTHORIZED_REQUEST = 'UNAUTHORIZED_REQUEST',
@@ -17,6 +15,11 @@ export enum AuthErrorCode {
   TOKEN_EXPIRED = 'TOKEN_EXPIRED',
 }
 
+export interface InvalidQshInfo {
+  computed: string;
+  received: string;
+}
+
 interface AuthErrorOptionalAttrs {
   code: AuthErrorCode;
   originError?: unknown | Error;
@@ -25,6 +28,9 @@ interface AuthErrorOptionalAttrs {
   qshInfo?: InvalidQshInfo;
 }
 
+/**
+ * Error thrown when authentication fails upon installation or request verification.
+ */
 export class AuthError extends Error implements AuthErrorOptionalAttrs {
   code: AuthErrorCode;
   originError?: unknown | Error;

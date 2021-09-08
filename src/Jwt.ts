@@ -1,8 +1,11 @@
 import * as atlassianJwt from 'atlassian-jwt';
 
 import { AuthError, AuthErrorCode } from './AuthError';
-import { ConnectCredentials, ConnectJwt } from './types';
+import { ConnectJwt } from './types';
 
+/**
+ * Decodes a Connect JWT without verifying its authenticity.
+ */
 export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
   try {
     return atlassianJwt.decodeSymmetric(
@@ -19,15 +22,20 @@ export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
   }
 }
 
+export interface VerifyConnectJwtArgs {
+  rawConnectJwt: string;
+  sharedSecret: string;
+  unverifiedConnectJwt?: ConnectJwt; // information value added to error in case of the verification fails
+}
+
+/**
+ * Decodes a Connect JWT verifying it against the Shared Secret (provided during installation) and checks expiration.
+ */
 export function verifyConnectJwt({
   rawConnectJwt,
-  credentials: { sharedSecret },
+  sharedSecret,
   unverifiedConnectJwt,
-}: {
-  rawConnectJwt: string;
-  credentials: ConnectCredentials;
-  unverifiedConnectJwt?: ConnectJwt;
-}): ConnectJwt {
+}: VerifyConnectJwtArgs): ConnectJwt {
   let connectJwt;
 
   try {
@@ -54,24 +62,4 @@ export function verifyConnectJwt({
   }
 
   return connectJwt;
-}
-
-export function verifyQueryStringHash({
-  requestComputedQsh,
-  connectJwt,
-}: {
-  requestComputedQsh: string;
-  connectJwt: ConnectJwt;
-}): void {
-  if (connectJwt.qsh !== requestComputedQsh) {
-    throw new AuthError('Invalid QSH', {
-      code: AuthErrorCode.INVALID_QSH,
-
-      qshInfo: {
-        computed: requestComputedQsh || /* istanbul ignore next: ignore fallback */ 'empty',
-        received: connectJwt.qsh || /* istanbul ignore next: ignore fallback */ 'empty',
-      },
-      connectJwt,
-    });
-  }
 }

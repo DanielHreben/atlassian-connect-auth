@@ -3,6 +3,9 @@ import { Request as ExpressRequest } from 'express';
 
 import { RequestReader } from './RequestReader';
 
+/**
+ * Express.js implementation of RequestReader.
+ */
 export class ExpressRequestReader implements RequestReader {
   constructor(public req: ExpressRequest) {}
 
