@@ -16,8 +16,8 @@ export interface ConnectJwt {
   [key: string]: unknown;
 }
 
-export enum InstallType {
-  newInstall = 'newInstall',
+export enum InstallationType {
+  newInstallation = 'newInstallation',
   update = 'update',
 }
 
@@ -35,3 +35,9 @@ export interface CredentialsWithEntity<E> {
 export interface CredentialsLoader<E> {
   (clientKey: string): Promise<CredentialsWithEntity<E> | undefined>;
 }
+
+/**
+ * Chooses the algorithm used to verify the content of an incoming request from Connect.
+ */
+export type QueryStringHashType = 'computed' | 'context' | 'any' | 'skip';
+export type InstallationQueryStringHashType = 'computed' | 'skip';

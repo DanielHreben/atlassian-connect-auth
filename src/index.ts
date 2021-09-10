@@ -1,5 +1,6 @@
+export * from './authDataProvider';
 export * from './AuthError';
 export * from './ConnectAuth';
 export * from './Jwt';
-export * from './requestReader';
+export * from './QueryStringHash';
 export * from './types';

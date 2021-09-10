@@ -1,6 +1,7 @@
 import * as atlassianJwt from 'atlassian-jwt';
+import { Request as ExpressRequest } from 'express';
 
-import { ExpressRequestReader } from '../src';
+import { ExpressReqAuthDataProvider } from '../src';
 import { createReq } from './helpers/util';
 
 const baseUrl = 'https://test.example.com';
@@ -11,42 +12,42 @@ const jiraPayload = {
 };
 const token = 'tkn';
 
-describe('ExpressRequestReader', () => {
+describe('ExpressReqAuthDataProvider', () => {
   describe('extractConnectJwt', () => {
-    test('obtains JWT from authorization header', async () => {
+    test('obtains JWT from authorization header', () => {
       const req = createReq({
         headers: { authorization: `JWT ${token}` },
       });
-      const jwt = new ExpressRequestReader(req).extractConnectJwt();
+      const jwt = new ExpressReqAuthDataProvider(req).extractConnectJwt();
       expect(jwt).toEqual(token);
     });
 
-    test('obtains JWT from query string', async () => {
+    test('obtains JWT from query string', () => {
       const req = createReq({
         query: { jwt: token },
       });
-      const jwt = new ExpressRequestReader(req).extractConnectJwt();
+      const jwt = new ExpressReqAuthDataProvider(req).extractConnectJwt();
       expect(jwt).toEqual(token);
     });
 
-    test('fallback to empty JWT if no token is provided', async () => {
+    test('falls back to empty JWT if no token is provided', () => {
       const req = createReq({});
-      const jwt = new ExpressRequestReader(req).extractConnectJwt();
+      const jwt = new ExpressReqAuthDataProvider(req).extractConnectJwt();
       expect(jwt).toEqual('');
     });
   });
 
-  test('obtains JWT from authorization header', async () => {
+  test('extractClientKey obtains clientKey', () => {
     const clientKey = 'ck';
     const req = createReq({
       body: { clientKey },
     });
-    const result = new ExpressRequestReader(req).extractClientKey();
+    const result = new ExpressReqAuthDataProvider(req).extractClientKey();
     expect(result).toEqual(clientKey);
   });
 
   describe('computeQueryStringHash', () => {
-    test('computes correct hash from a request object', async () => {
+    test('computes correct hash from a request object', () => {
       const req = createReq({
         body: jiraPayload,
         headers: { authorization: `JWT ${token}` },
@@ -66,8 +67,60 @@ describe('ExpressRequestReader', () => {
         baseUrl
       );
 
-      const qsh = new ExpressRequestReader(req).computeQueryStringHash(baseUrl);
+      const qsh = new ExpressReqAuthDataProvider(req).computeQueryStringHash(baseUrl);
       expect(qsh).toEqual(expectedHash);
+    });
+  });
+
+  describe('can be extended with a subclass so that', () => {
+    class MyExpressReqAuthDataProvider extends ExpressReqAuthDataProvider {
+      constructor(req: ExpressRequest) {
+        super(req);
+      }
+
+      extractConnectJwt(): string {
+        return (this.req.query.customJwt as string) ?? super.extractConnectJwt();
+      }
+
+      extractClientKey(): string {
+        return this.req.body.foo ?? super.extractClientKey();
+      }
+
+      computeQueryStringHash(): string {
+        return 'static-qsh';
+      }
+    }
+
+    const req = createReq({
+      body: { clientKey: 'jira-client-key' },
+      query: { jwt: token },
+    });
+    const reqWithOverrides = createReq({
+      body: { clientKey: 'jira-client-key', foo: 'foo' },
+      query: { jwt: token, customJwt: 'customTkn' },
+    });
+
+    test('extractConnectJwt supports additional ways of extracting the JWT', () => {
+      const jwt = new MyExpressReqAuthDataProvider(req).extractConnectJwt();
+      expect(jwt).toEqual(token);
+      const overriddenJwt = new MyExpressReqAuthDataProvider(reqWithOverrides).extractConnectJwt();
+      expect(overriddenJwt).toEqual('customTkn');
+    });
+
+    test('extractClientKey supports additional ways of extracting the clientKey', () => {
+      const result = new MyExpressReqAuthDataProvider(req).extractClientKey();
+      expect(result).toEqual('jira-client-key');
+      const overriddenRrsult = new MyExpressReqAuthDataProvider(
+        reqWithOverrides
+      ).extractClientKey();
+      expect(overriddenRrsult).toEqual('foo');
+    });
+
+    test('computeQueryStringHash supports additional ways of computing the hash', () => {
+      const overriddenQsh = new MyExpressReqAuthDataProvider(
+        reqWithOverrides
+      ).computeQueryStringHash();
+      expect(overriddenQsh).toEqual('static-qsh');
     });
   });
 });

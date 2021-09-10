@@ -1,192 +1,142 @@
+import { AuthDataProvider } from './authDataProvider';
 import { AuthError, AuthErrorCode } from './AuthError';
 import { decodeUnverifiedConnectJwt, verifyConnectJwt } from './Jwt';
-import { RequestReader } from './requestReader';
-import { ConnectJwt, ContextQsh, CredentialsLoader, InstallType } from './types';
+import { verifyQueryStringHash } from './QueryStringHash';
+import {
+  ConnectJwt,
+  CredentialsLoader,
+  InstallationQueryStringHashType,
+  InstallationType,
+  QueryStringHashType,
+} from './types';
 
-interface CommonVerifyArgs<E> {
+interface CommonVerifyArgs<E, Q> {
   baseUrl: string;
-  requestReader: RequestReader;
-  loadCredentials: CredentialsLoader<E>;
-  skipQueryStringHashCheck?: boolean; // Bitbucket does not implement Query String Hash
+  authDataProvider: AuthDataProvider;
+  credentialsLoader: CredentialsLoader<E>;
+  queryStringHashType?: Q;
 }
 
-export type VerifyInstallArgs<E> = CommonVerifyArgs<E>;
+export type VerifyInstallationArgs<E> = CommonVerifyArgs<E, InstallationQueryStringHashType>;
 
-export interface VerifyInstallNewResponse {
-  type: InstallType.newInstall;
+export interface NewInstallationResponse {
+  type: InstallationType.newInstallation;
   clientKey: string;
 }
 
-export interface VerifyInstallUpdateResponse<E> {
-  type: InstallType.update;
+export interface UpdateInstallationResponse<E> {
+  type: InstallationType.update;
   clientKey: string;
   connectJwt: ConnectJwt;
   storedEntity: E;
 }
 
-export type VerifyInstallResponse<E> = VerifyInstallNewResponse | VerifyInstallUpdateResponse<E>;
+export type VerifyInstallationResponse<E> = NewInstallationResponse | UpdateInstallationResponse<E>;
 
-export interface VerifyRequestArgs<E> extends CommonVerifyArgs<E> {
-  useContextJwt?: boolean;
-}
+export type VerifyRequestArgs<E> = CommonVerifyArgs<E, QueryStringHashType>;
 
 export interface VerifyRequestResponse<E> {
   connectJwt: ConnectJwt;
   storedEntity: E;
 }
 
-export interface VerifyQueryStringHashArgs {
-  baseUrl: string;
-  connectJwt: ConnectJwt;
-  requestReader: RequestReader;
-  useContextJwt?: boolean;
-  skipQueryStringHashCheck?: boolean; // Bitbucket does not implement Query String Hash
-}
-
 /**
- * Entry point for Connect request authentication.
+ * Verifies a Connect request installation.
+ * Use this function to make sure the request is valid before persisting any data.
+ * This function handles both new installations and re-installations or installation updates.
  */
-export class ConnectAuth {
-  /**
-   * Verifies a Connect request installation.
-   * Use this method to make sure the request is valid before persisting any data.
-   * This method handles both new installations and re-installations or installation updates.
-   */
-  static async verifyInstall<E>({
-    baseUrl,
-    requestReader,
-    loadCredentials,
-    skipQueryStringHashCheck,
-  }: VerifyInstallArgs<E>): Promise<VerifyInstallResponse<E>> {
-    const clientKey = requestReader.extractClientKey();
+export async function verifyInstallation<E>({
+  baseUrl,
+  authDataProvider,
+  credentialsLoader,
+  queryStringHashType,
+}: VerifyInstallationArgs<E>): Promise<VerifyInstallationResponse<E>> {
+  const clientKey = authDataProvider.extractClientKey();
 
-    // Check issuer
-    const rawConnectJwt = requestReader.extractConnectJwt();
-    let unverifiedConnectJwt;
-    if (rawConnectJwt) {
-      unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
-      if (unverifiedConnectJwt.iss !== clientKey) {
-        throw new AuthError('Wrong issuer', {
-          code: AuthErrorCode.WRONG_ISSUER,
-          unverifiedConnectJwt,
-        });
-      }
-    }
-
-    // Check new installation
-    const credentials = await loadCredentials(clientKey);
-    if (!credentials) {
-      return {
-        type: InstallType.newInstall,
-        clientKey,
-      };
-    }
-
-    // Check installation update
-    if (rawConnectJwt) {
-      const connectJwt = verifyConnectJwt({
-        rawConnectJwt,
-        sharedSecret: credentials.sharedSecret,
+  // Check issuer
+  const rawConnectJwt = authDataProvider.extractConnectJwt();
+  let unverifiedConnectJwt;
+  if (rawConnectJwt) {
+    unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
+    if (unverifiedConnectJwt.iss !== clientKey) {
+      throw new AuthError('Wrong issuer', {
+        code: AuthErrorCode.WRONG_ISSUER,
         unverifiedConnectJwt,
       });
-
-      if (!skipQueryStringHashCheck) {
-        ConnectAuth.verifyQsh({ baseUrl, connectJwt, requestReader });
-      }
-
-      return {
-        type: InstallType.update,
-        clientKey,
-        connectJwt,
-        storedEntity: credentials.storedEntity,
-      };
     }
-
-    throw new AuthError('Unauthorized update request', {
-      code: AuthErrorCode.UNAUTHORIZED_REQUEST,
-    });
   }
 
-  /**
-   * Verifies any post-installation incoming connect requests using currently stored Shared Secret.
-   * Use this method to verify the request was actually initiated by Atlassian Connect service and that its content
-   * is not tainted via the Query String Hash algorithm.
-   * This method handles both API requests and frame-loading requests, in which case you should pass
-   * `useContextJwt: true`.
-   */
-  static async verifyRequest<E>({
-    baseUrl,
-    requestReader,
-    loadCredentials,
-    useContextJwt,
-    skipQueryStringHashCheck,
-  }: VerifyRequestArgs<E>): Promise<VerifyRequestResponse<E>> {
-    const rawConnectJwt = requestReader.extractConnectJwt();
-    if (!rawConnectJwt) {
-      throw new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT });
-    }
+  // Check new installation
+  const credentials = await credentialsLoader(clientKey);
+  if (!credentials) {
+    return {
+      type: InstallationType.newInstallation,
+      clientKey,
+    };
+  }
 
-    // Load existing installation
-    const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
-    const credentials = await loadCredentials(unverifiedConnectJwt.iss);
-    if (!credentials) {
-      throw new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER });
-    }
-
+  // Check installation update
+  if (rawConnectJwt) {
     const connectJwt = verifyConnectJwt({
       rawConnectJwt,
       sharedSecret: credentials.sharedSecret,
       unverifiedConnectJwt,
     });
 
-    ConnectAuth.verifyQsh({
-      baseUrl,
+    verifyQueryStringHash({
+      queryStringHashType,
       connectJwt,
-      requestReader,
-      useContextJwt,
-      skipQueryStringHashCheck,
+      computeQueryStringHashFunction: () => authDataProvider.computeQueryStringHash(baseUrl),
     });
 
-    return { connectJwt, storedEntity: credentials.storedEntity };
+    return {
+      type: InstallationType.update,
+      clientKey,
+      connectJwt,
+      storedEntity: credentials.storedEntity,
+    };
   }
 
-  /**
-   * Verifies the Query String Hash value provided in a Connect JWT against an incoming request to make sure the payload
-   * is not tainted.
-   * This method is not usually called directly. See `verifyInstall` and `verifyRequest`.
-   */
-  static verifyQsh({
-    baseUrl,
+  throw new AuthError('Unauthorized update request', {
+    code: AuthErrorCode.UNAUTHORIZED_REQUEST,
+  });
+}
+
+/**
+ * Verifies any post-installation incoming connect requests using currently stored Shared Secret.
+ * Use this function to verify the request was actually initiated by Atlassian Connect service and that its content
+ * is not tainted via the Query String Hash algorithm.
+ * This function handles API, frame-loading, context, and some app-lifecycle requests.
+ */
+export async function verifyRequest<E>({
+  baseUrl,
+  authDataProvider,
+  credentialsLoader,
+  queryStringHashType,
+}: VerifyRequestArgs<E>): Promise<VerifyRequestResponse<E>> {
+  const rawConnectJwt = authDataProvider.extractConnectJwt();
+  if (!rawConnectJwt) {
+    throw new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT });
+  }
+
+  // Load existing installation
+  const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
+  const credentials = await credentialsLoader(unverifiedConnectJwt.iss);
+  if (!credentials) {
+    throw new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER });
+  }
+
+  const connectJwt = verifyConnectJwt({
+    rawConnectJwt,
+    sharedSecret: credentials.sharedSecret,
+    unverifiedConnectJwt,
+  });
+
+  verifyQueryStringHash({
+    queryStringHashType,
     connectJwt,
-    requestReader,
-    useContextJwt = false,
-    skipQueryStringHashCheck = false,
-  }: VerifyQueryStringHashArgs): void {
-    if (skipQueryStringHashCheck) {
-      return;
-    }
+    computeQueryStringHashFunction: () => authDataProvider.computeQueryStringHash(baseUrl),
+  });
 
-    if (!connectJwt.qsh) {
-      throw new AuthError('JWT did not contain the query string hash (qsh) claim', {
-        code: AuthErrorCode.MISSING_QSH,
-        connectJwt,
-      });
-    }
-
-    const requestComputedQsh = useContextJwt
-      ? ContextQsh
-      : requestReader.computeQueryStringHash(baseUrl);
-
-    if (connectJwt.qsh !== requestComputedQsh) {
-      throw new AuthError('Invalid QSH', {
-        code: AuthErrorCode.INVALID_QSH,
-
-        qshInfo: {
-          computed: requestComputedQsh || /* istanbul ignore next: ignore fallback */ 'empty',
-          received: connectJwt.qsh || /* istanbul ignore next: ignore fallback */ 'empty',
-        },
-        connectJwt,
-      });
-    }
-  }
+  return { connectJwt, storedEntity: credentials.storedEntity };
 }

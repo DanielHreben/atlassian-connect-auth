@@ -1,12 +1,12 @@
 import * as atlassianJwt from 'atlassian-jwt';
 import { Request as ExpressRequest } from 'express';
 
-import { RequestReader } from './RequestReader';
+import { AuthDataProvider } from './AuthDataProvider';
 
 /**
- * Express.js implementation of RequestReader.
+ * Express.js implementation of AuthDataProvider.
  */
-export class ExpressRequestReader implements RequestReader {
+export class ExpressReqAuthDataProvider implements AuthDataProvider {
   constructor(public req: ExpressRequest) {}
 
   extractConnectJwt(): string {

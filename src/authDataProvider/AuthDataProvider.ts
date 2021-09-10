@@ -2,9 +2,9 @@
  * This interface is used by the library to obtain information about HTTP requests so they can
  * be verified. Implement it to adapt this library to any HTTP framework or library of your preference.
  */
-export interface RequestReader {
+export interface AuthDataProvider {
   /**
-   * Should extract the JWT from the `Authorization` header or the `jwt` query parameter (deprecated).
+   * Should extract the JWT from the `Authorization` header or the `jwt` query parameter.
    * See: https://developer.atlassian.com/cloud/jira/platform/understanding-jwt-for-connect-apps/
    */
   extractConnectJwt(): string;

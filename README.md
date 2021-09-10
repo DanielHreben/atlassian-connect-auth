@@ -10,16 +10,17 @@ For a deeper understanding of the concepts built into this library, please read 
 - [Confluence Cloud: Understanding JWT for Connect apps](https://developer.atlassian.com/cloud/confluence/understanding-jwt/)
 - [Bitbucket App: Understanding JWT for apps](https://developer.atlassian.com/cloud/bitbucket/understanding-jwt-for-apps/)
 
-Here's an agnostic example of how to use it:
+## Usage
 
 ```typescript
 import {
   AuthError,
   AuthErrorCode,
-  ConnectAuth,
   CredentialsWithEntity,
-  ExpressRequestReader,
-  InstallType,
+  ExpressReqAuthDataProvider,
+  InstallationType,
+  verifyInstallation,
+  verifyRequest,
 } from 'atlassian-connect-auth'
 
 const baseUrl = 'https://your-app-base-url.com'
@@ -34,17 +35,17 @@ async function loadInstallationEntity(clientKey: string): Promise<CredentialsWit
   }
 }
 
-const handleInstall = async (req, res) => {
+const handleInstallation = async (req, res) => {
   try {
-    const result = await ConnectAuth.verifyInstall({
+    const result = await verifyInstallation({
       baseUrl,
-      requestReader: new ExpressRequestReader(req),
-      loadCredentials: loadInstallationEntity,
+      authDataProvider: new ExpressReqAuthDataProvider(req),
+      credentialsLoader: loadInstallationEntity,
     })
 
     const newInstallationEntity = req.body
 
-    if (result.type === InstallType.update) {
+    if (result.type === InstallationType.update) {
       const existingInstallationEntity = result.storedEntity
       await existingInstallationEntity.update(newInstallationEntity)
     } else {
@@ -65,11 +66,11 @@ const handleInstall = async (req, res) => {
 
 const handleAuth = async (req, res, next) => {
   try {
-    const { connectJwt, storedEntity } = await ConnectAuth.verifyRequest({
+    const { connectJwt, storedEntity } = await verifyRequest({
       baseUrl,
-      requestReader: new ExpressRequestReader(req),
-      loadCredentials: loadInstallationEntity,
-      useContextJwt: true,
+      authDataProvider: new ExpressReqAuthDataProvider(req),
+      credentialsLoader: loadInstallationEntity,
+      queryStringHashType: 'context',
     })
 
     req.context = {
