@@ -1,10 +1,4 @@
-import { Request } from 'express';
-
 import { AuthDataProvider } from '../../src';
-
-export function createReq(props: unknown): Request {
-  return Object.assign({}, props) as Request;
-}
 
 export class TestAuthDataProvider implements AuthDataProvider {
   qsh: string;

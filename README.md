@@ -16,6 +16,7 @@ For a deeper understanding of the concepts built into this library, please read 
 import {
   AuthError,
   AuthErrorCode,
+  AxiosKeyProvider,
   CredentialsWithEntity,
   ExpressReqAuthDataProvider,
   InstallationType,
@@ -24,6 +25,7 @@ import {
 } from 'atlassian-connect-auth'
 
 const baseUrl = 'https://your-app-base-url.com'
+const asymmetricKeyProvider = new AxiosKeyProvider()
 
 async function loadInstallationEntity(clientKey: string): Promise<CredentialsWithEntity<InstallationEntity>> {
   const storedEntity = await model.InstallationEntity.findOne({ where: { clientKey } })
@@ -39,6 +41,7 @@ const handleInstallation = async (req, res) => {
   try {
     const result = await verifyInstallation({
       baseUrl,
+      asymmetricKeyProvider,
       authDataProvider: new ExpressReqAuthDataProvider(req),
       credentialsLoader: loadInstallationEntity,
     })
@@ -68,6 +71,7 @@ const handleAuth = async (req, res, next) => {
   try {
     const { connectJwt, storedEntity } = await verifyRequest({
       baseUrl,
+      asymmetricKeyProvider,
       authDataProvider: new ExpressReqAuthDataProvider(req),
       credentialsLoader: loadInstallationEntity,
       queryStringHashType: 'context',

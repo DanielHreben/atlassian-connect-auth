@@ -28,15 +28,13 @@ export function verifyQueryStringHash({
   }
 
   // Check context QSH
-  if (
-    (queryStringHashType === 'context' || queryStringHashType === 'any') &&
-    connectJwt.qsh === ContextQsh
-  ) {
+  const isContext = queryStringHashType === 'context';
+  if ((isContext || queryStringHashType === 'any') && connectJwt.qsh === ContextQsh) {
     return;
   }
 
   // Check computed hash
-  let requestComputedQsh = 'skipped';
+  let requestComputedQsh = isContext ? 'context' : 'skipped';
   if (queryStringHashType === 'computed' || queryStringHashType === 'any') {
     requestComputedQsh = computeQueryStringHashFunction();
     if (connectJwt.qsh === requestComputedQsh) {

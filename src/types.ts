@@ -3,17 +3,18 @@ type Timestamp = number;
 export const ContextQsh = 'context-qsh';
 
 /**
- * Represents an extensible payload of a Connect JWT.
+ * Represents the payload of a Connect JWT.
  */
 export interface ConnectJwt {
-  sub: string;
-  qsh?: string | typeof ContextQsh;
-  iss: string; // clientKey
-  aud: string; // app's baseUrl
-  exp: Timestamp;
-  iat: Timestamp;
-  context: unknown;
-  [key: string]: unknown;
+  iss: string; // When a product is calling the app, this is the clientKey or app key.
+  kid?: string; // Public key id used in signed installs.
+  alg: string; // Extracted from the JWT header and put here for convenience.
+  aud: Array<string>; // App's baseUrl.
+  sub?: string; // Atlassian account ID, if associated with a logged-in user.
+  qsh?: string | typeof ContextQsh; // Query String Hash: a hash of the request.
+  exp: Timestamp; // Expiration timestamp.
+  iat: Timestamp; // Token generation timestamp.
+  context: unknown; // Optional context from the product. Varies according to the WebHook.
 }
 
 export enum InstallationType {

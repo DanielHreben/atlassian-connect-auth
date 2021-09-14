@@ -2,7 +2,7 @@ import * as atlassianJwt from 'atlassian-jwt';
 import { Request as ExpressRequest } from 'express';
 
 import { ExpressReqAuthDataProvider } from '../src';
-import { createReq } from './helpers/util';
+import { createReq } from './helpers/Request';
 
 const baseUrl = 'https://test.example.com';
 const jiraPayload = {
