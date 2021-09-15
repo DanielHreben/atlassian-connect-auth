@@ -2,28 +2,55 @@
 
 [![Known Vulnerabilities](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth/badge.svg?targetFile=package.json)](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth?targetFile=package.json)
 
-Helper for handling webhooks from Atlassian products
+This library implements authentication for installation requests, webhooks, and page loading from Atlassian products built with Connect.
 
-```javascript
-const { Addon, AuthError } = require('atlassian-connect-auth')
+For a deeper understanding of the concepts built into this library, please read through the Atlassian Connect documentation for the corresponding product:
 
-const addon = new Addon({
-  baseUrl: 'https://your-addon-url.com',
-  product: 'jira', // ('jira', 'confluence', or 'bitbucket')
-})
+- [Jira Cloud: Understanding JWT for Connect apps](https://developer.atlassian.com/cloud/jira/platform/understanding-jwt-for-connect-apps/)
+- [Confluence Cloud: Understanding JWT for Connect apps](https://developer.atlassian.com/cloud/confluence/understanding-jwt/)
+- [Bitbucket App: Understanding JWT for apps](https://developer.atlassian.com/cloud/bitbucket/understanding-jwt-for-apps/)
 
-const handleInstall = (req, res) => {
+## Usage
+
+```typescript
+import {
+  AuthError,
+  AuthErrorCode,
+  CredentialsWithEntity,
+  ExpressReqAuthDataProvider,
+  InstallationType,
+  verifyInstallation,
+  verifyRequest,
+} from 'atlassian-connect-auth'
+
+const baseUrl = 'https://your-app-base-url.com'
+
+async function loadInstallationEntity(clientKey: string): Promise<CredentialsWithEntity<InstallationEntity>> {
+  const storedEntity = await model.InstallationEntity.findOne({ where: { clientKey } })
+  if (storedEntity) {
+    return {
+      sharedSecret: decrypt(storedEntity.encryptedSharedSecret),
+      storedEntity,
+    }
+  }
+}
+
+const handleInstallation = async (req, res) => {
   try {
-    await addon.install(req, {
-      loadCredentials: clientKey => model.Credentials.findOne({ where: { clientKey } }),
-      saveCredentials: (clientKey, newCredentials, storedCredentials) => {
-        if (storedCredentials) {
-          return storedCredentials.update(newCredentials)
-        }
-
-        return model.Credentials.create(newCredentials)
-      }
+    const result = await verifyInstallation({
+      baseUrl,
+      authDataProvider: new ExpressReqAuthDataProvider(req),
+      credentialsLoader: loadInstallationEntity,
     })
+
+    const newInstallationEntity = req.body
+
+    if (result.type === InstallationType.update) {
+      const existingInstallationEntity = result.storedEntity
+      await existingInstallationEntity.update(newInstallationEntity)
+    } else {
+      await model.InstallationEntity.create(newInstallationEntity)
+    }
 
     res.sendStatus(201)
   } catch (error) {
@@ -37,11 +64,19 @@ const handleInstall = (req, res) => {
   }
 }
 
-const handleAuth = (req, res, next) => {
+const handleAuth = async (req, res, next) => {
   try {
-    await addon.auth(req, {
-      loadCredentials: clientKey => model.Credentials.findOne({ where: { clientKey } })
+    const { connectJwt, storedEntity } = await verifyRequest({
+      baseUrl,
+      authDataProvider: new ExpressReqAuthDataProvider(req),
+      credentialsLoader: loadInstallationEntity,
+      queryStringHashType: 'context',
     })
+
+    req.context = {
+      accountId: connectJwt.context?.user?.accountId ?? connectJwt.sub,
+      installationData: storedEntity
+    }
 
     next()
   } catch (error) {

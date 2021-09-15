@@ -5,4 +5,10 @@ module.exports = {
   coveragePathIgnorePatterns: ['/helpers/', '/node_modules/'],
   collectCoverage: true,
   setupFilesAfterEnv: ['jest-matcher-specific-error'],
+  globals: {
+    'ts-jest': {
+      'diagnostics': false,
+      'isolatedModules': true,
+    }
+  }
 }

@@ -1,3 +1,6 @@
-export { Addon } from './Addon';
-export { AuthError, AuthErrorCodes } from './AuthError';
+export * from './authDataProvider';
+export * from './AuthError';
+export * from './ConnectAuth';
+export * from './Jwt';
+export * from './QueryStringHash';
 export * from './types';
