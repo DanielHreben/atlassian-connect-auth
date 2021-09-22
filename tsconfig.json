@@ -13,7 +13,7 @@
     "noUnusedLocals": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "types": ["jest-matcher-specific-error"],
+    "types": ["jest-matcher-specific-error", "node"],
   },
   "include": ["./src"]
 }

@@ -11,13 +11,11 @@ import {
   verifyInstallation,
   VerifyInstallationArgs,
 } from '../src';
-import {
-  AnotherAsymmetricPrivateKey,
-  AsymmetricPrivateKey,
-  AsymmetricPublicKey,
-} from './helpers/AsymmetricKey';
+import { generateTestAsymmetricKeys } from './helpers/AsymmetricKey';
 import { TestAuthDataProvider } from './helpers/TestAuthDataProvider';
 
+const AsymmetricKey = generateTestAsymmetricKeys();
+const AlternativeAsymmetricKey = generateTestAsymmetricKeys();
 const baseUrl = 'https://test.example.com';
 const clientKey = 'client-key';
 const sharedSecret = 'shh-secret-cat';
@@ -202,7 +200,7 @@ describe('verifyInstallation with signed install', () => {
     if (qsh) payload.qsh = qsh;
     const jwt = atlassianJwt.encodeAsymmetric(
       payload,
-      pk || AsymmetricPrivateKey,
+      pk || AsymmetricKey.privateKey,
       atlassianJwt.AsymmetricAlgorithm.RS256,
       {
         kid,
@@ -213,7 +211,7 @@ describe('verifyInstallation with signed install', () => {
 
   describe('succeeds for', () => {
     beforeEach(() => {
-      keyProviderGet.mockResolvedValue(AsymmetricPublicKey);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
     });
 
     test('first-time installation', async () => {
@@ -351,7 +349,7 @@ describe('verifyInstallation with signed install', () => {
 
     test('because QSH is missing', async () => {
       credentialsLoader.mockReturnValue(storedEntity);
-      keyProviderGet.mockResolvedValue(AsymmetricPublicKey);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
       const { payload, jwt } = asymmetricJwt({ aud: baseUrl });
 
       await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
@@ -364,7 +362,7 @@ describe('verifyInstallation with signed install', () => {
 
     test('because QSH is invalid', async () => {
       credentialsLoader.mockReturnValue(storedEntity);
-      keyProviderGet.mockResolvedValue(AsymmetricPublicKey);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
       const { payload, jwt } = asymmetricJwt({ qsh: 'valid', aud: baseUrl });
 
       await expect(
@@ -380,7 +378,7 @@ describe('verifyInstallation with signed install', () => {
 
     test('because JWT is missing on update', async () => {
       credentialsLoader.mockReturnValue(credentials);
-      keyProviderGet.mockResolvedValue(AsymmetricPublicKey);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
 
       await expect(verifyInstallation(verifyInstallationArgs())).rejects.toMatchError(
         new AuthError('Unauthorized update request', { code: AuthErrorCode.UNAUTHORIZED_REQUEST })
@@ -401,8 +399,11 @@ describe('verifyInstallation with signed install', () => {
 
     test('because JWT signature is invalid', async () => {
       credentialsLoader.mockReturnValue(credentials);
-      keyProviderGet.mockResolvedValue(AsymmetricPublicKey);
-      const { payload, jwt } = asymmetricJwt({ aud: baseUrl, pk: AnotherAsymmetricPrivateKey });
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
+      const { payload, jwt } = asymmetricJwt({
+        aud: baseUrl,
+        pk: AlternativeAsymmetricKey.privateKey,
+      });
 
       await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
         new AuthError('Invalid signature', {
