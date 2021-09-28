@@ -3,6 +3,7 @@
     "declaration": true,
     "declarationMap": true,
     "target": "es2019",
+    "lib": ["es2019", "dom"],
     "module": "commonjs",
     "allowJs": false,
     "strict": true,
@@ -14,6 +15,7 @@
     "resolveJsonModule": true,
     "outDir": "./dist",
     "types": ["jest-matcher-specific-error", "node"],
+    "typeRoots": ["./node_modules/@types"]
   },
   "include": ["./src"]
 }
