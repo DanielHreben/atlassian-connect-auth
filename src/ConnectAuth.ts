@@ -17,7 +17,7 @@ import {
 } from './types';
 
 interface CommonVerifyArgs<E, Q> {
-  asymmetricKeyProvider?: KeyProvider;
+  asymmetricKeyProvider: KeyProvider;
   authDataProvider: AuthDataProvider;
   authorizationMethod?: 'sharedSecret' | 'publicKey' | 'any';
   baseUrl: string;
@@ -69,10 +69,6 @@ export async function verifyInstallation<E>({
     authorizationMethod === 'publicKey' ||
     (authorizationMethod === 'any' && isAsymmetricAlgorithm(unverifiedConnectJwt?.alg))
   ) {
-    if (!asymmetricKeyProvider) {
-      throw new Error('Missing asymmetricKeyProvider instance');
-    }
-
     const connectJwt = await verifyAsymmetricallySignedRequest({
       authDataProvider,
       asymmetricKeyProvider,
@@ -188,10 +184,6 @@ export async function verifyRequest<E>({
     authorizationMethod === 'publicKey' ||
     (authorizationMethod === 'any' && isAsymmetricAlgorithm(unverifiedConnectJwt.alg))
   ) {
-    if (!asymmetricKeyProvider) {
-      throw new Error('Missing asymmetricKeyProvider instance');
-    }
-
     const connectJwt = await verifyAsymmetricallySignedRequest({
       authDataProvider,
       asymmetricKeyProvider,

@@ -385,18 +385,6 @@ describe('verifyInstallation with signed install', () => {
       );
     });
 
-    test('asymmetricKeyProvider is not provided', async () => {
-      const { jwt } = asymmetricJwt();
-
-      await expect(
-        verifyInstallation({
-          baseUrl,
-          authDataProvider: new TestAuthDataProvider({ qsh, clientKey, jwt }),
-          credentialsLoader,
-        })
-      ).rejects.toMatchError(new Error('Missing asymmetricKeyProvider instance'));
-    });
-
     test('because JWT signature is invalid', async () => {
       credentialsLoader.mockReturnValue(credentials);
       keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
