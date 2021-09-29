@@ -18,11 +18,11 @@ import {
   AuthErrorCode,
   CredentialsWithEntity,
   ExpressReqAuthDataProvider,
+  GotKeyProvider,
   InstallationType,
   verifyInstallation,
   verifyRequest,
 } from 'atlassian-connect-auth'
-import { GotKeyProvider } from 'atlassian-connect-auth/dist/publicKeyProvider/GotKeyProvider'
 
 const baseUrl = 'https://your-app-base-url.com'
 const asymmetricKeyProvider = new GotKeyProvider()

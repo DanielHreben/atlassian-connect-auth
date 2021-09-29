@@ -1,8 +1,10 @@
 import * as atlassianJwt from 'atlassian-jwt';
+import nock from 'nock';
 
 import {
   AuthError,
   AuthErrorCode,
+  ConnectInstallKeysCdnUrl,
   ConnectJwt,
   CredentialsWithEntity,
   InstallationQueryStringHashType,
@@ -52,6 +54,7 @@ const verifyInstallationArgs = ({
 
 afterEach(() => {
   jest.resetAllMocks();
+  nock.cleanAll();
 });
 
 describe('verifyInstallation with legacy authentication', () => {
@@ -228,6 +231,26 @@ describe('verifyInstallation with signed install', () => {
       expect(keyProviderGet).toHaveBeenCalledWith('kid', payload);
     });
 
+    test('first-time installation with default key provider', async () => {
+      nock(ConnectInstallKeysCdnUrl.production).get('/kid').reply(200, AsymmetricKey.publicKey);
+
+      const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
+
+      const result = await verifyInstallation({
+        baseUrl,
+        authDataProvider: new TestAuthDataProvider({ qsh, clientKey, jwt }),
+        credentialsLoader,
+        asymmetricKeyProvider: undefined,
+      });
+
+      expect(result).toStrictEqual({
+        type: InstallationType.newInstallation,
+        clientKey,
+        connectJwt: payload,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
+
     test('first-time installation without QSH checking', async () => {
       const { payload, jwt } = asymmetricJwt({ qsh: 'random', aud: baseUrl });
 
@@ -319,7 +342,7 @@ describe('verifyInstallation with signed install', () => {
         })
       );
     });
-
+    //
     test('because JWT kid is missing', async () => {
       credentialsLoader.mockReturnValue(storedEntity);
       const { payload, jwt } = asymmetricJwt({ aud: baseUrl, kid: '' });
@@ -373,15 +396,6 @@ describe('verifyInstallation with signed install', () => {
           connectJwt: payload,
           qshInfo: { computed: 'invalid', received: 'valid' },
         })
-      );
-    });
-
-    test('because JWT is missing on update', async () => {
-      credentialsLoader.mockReturnValue(credentials);
-      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
-
-      await expect(verifyInstallation(verifyInstallationArgs())).rejects.toMatchError(
-        new AuthError('Unauthorized update request', { code: AuthErrorCode.UNAUTHORIZED_REQUEST })
       );
     });
 

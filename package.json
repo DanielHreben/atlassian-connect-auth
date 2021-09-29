@@ -45,9 +45,6 @@
     "axios": {
       "optional": true
     },
-    "got": {
-      "optional": true
-    },
     "node-fetch": {
       "optional": true
     }
