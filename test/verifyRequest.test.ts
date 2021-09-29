@@ -1,10 +1,8 @@
 import * as atlassianJwt from 'atlassian-jwt';
-import nock from 'nock';
 
 import {
   AuthError,
   AuthErrorCode,
-  ConnectInstallKeysCdnUrl,
   ConnectJwt,
   CredentialsWithEntity,
   KeyProvider,
@@ -269,26 +267,6 @@ describe('verifyRequest with signed install', () => {
       const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
 
       const result = await verifyRequest(verifyRequestArgs({ jwt, qsh }));
-
-      expect(result).toStrictEqual({
-        connectJwt: payload,
-        storedEntity,
-      });
-      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
-    });
-
-    test('uninstallation with default key provider', async () => {
-      nock(ConnectInstallKeysCdnUrl.production).get('/kid').reply(200, AsymmetricKey.publicKey);
-
-      credentialsLoader.mockReturnValue(credentials);
-      const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
-
-      const result = await verifyRequest({
-        baseUrl,
-        authDataProvider: new TestAuthDataProvider({ qsh, clientKey, jwt }),
-        credentialsLoader,
-        asymmetricKeyProvider: undefined,
-      });
 
       expect(result).toStrictEqual({
         connectJwt: payload,

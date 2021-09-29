@@ -1,6 +1,6 @@
 import fetch, { RequestInit } from 'node-fetch';
 
-import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from './KeyProvider';
+import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from '../../src';
 
 export interface NodeFetchKeyProviderArgs {
   environment?: EnvironmentType;

@@ -9,9 +9,9 @@ import {
   ConnectJwt,
   KeyProvider,
 } from '../src';
-import { AxiosKeyProvider } from '../src/publicKeyProvider/AxiosKeyProvider';
-import { GotKeyProvider } from '../src/publicKeyProvider/GotKeyProvider';
-import { NodeFetchKeyProvider } from '../src/publicKeyProvider/NodeFetchKeyProvider';
+import { AxiosKeyProvider } from './keyProviderExamples/AxiosKeyProvider';
+import { GotKeyProvider } from './keyProviderExamples/GotKeyProvider';
+import { NodeFetchKeyProvider } from './keyProviderExamples/NodeFetchKeyProvider';
 
 const kid = 'kid';
 const publicKey = 'pk';

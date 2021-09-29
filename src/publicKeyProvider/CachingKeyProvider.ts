@@ -12,7 +12,7 @@ export interface CachingKeyProviderArgs {
 }
 
 /**
- * Implementation that facilitates caching a recent public key in case CDN is inaccessible.
+ * General-purpose implementation that facilitates caching a recent public key in case CDN is inaccessible.
  * Caching is optional and, if used, must be done by the `kid`. Public keys should be rotated often and will get a new
  * kid every time which will then effectively invalidate the cache.
  */

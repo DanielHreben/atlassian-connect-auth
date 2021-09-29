@@ -18,11 +18,14 @@ import {
   AuthErrorCode,
   CredentialsWithEntity,
   ExpressReqAuthDataProvider,
-  GotKeyProvider,
   InstallationType,
   verifyInstallation,
   verifyRequest,
 } from 'atlassian-connect-auth'
+
+// Consumers of this library have to provide a KeyProvider implementation that will fetch the public key from a CDN.
+// Examples can be found under the `test` directory in this library.
+import { GotKeyProvider } from './GotKeyProvider';
 
 const baseUrl = 'https://your-app-base-url.com'
 const asymmetricKeyProvider = new GotKeyProvider()

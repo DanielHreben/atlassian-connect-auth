@@ -1,6 +1,6 @@
 import got, { Got, Options } from 'got';
 
-import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from './KeyProvider';
+import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from '../../src';
 
 export interface GotKeyProviderOptionsArgs {
   environment?: EnvironmentType;

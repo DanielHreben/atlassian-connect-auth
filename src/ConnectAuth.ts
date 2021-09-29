@@ -6,7 +6,7 @@ import {
   verifyAsymmetricConnectJwt,
   verifyConnectJwt,
 } from './Jwt';
-import { GotKeyProvider, KeyProvider } from './publicKeyProvider';
+import { KeyProvider } from './publicKeyProvider';
 import { verifyQueryStringHash } from './QueryStringHash';
 import {
   ConnectJwt,
@@ -17,7 +17,7 @@ import {
 } from './types';
 
 interface CommonVerifyArgs<E, Q> {
-  asymmetricKeyProvider?: KeyProvider;
+  asymmetricKeyProvider: KeyProvider;
   authDataProvider: AuthDataProvider;
   authorizationMethod?: 'sharedSecret' | 'publicKey' | 'any';
   baseUrl: string;
@@ -48,7 +48,7 @@ export type VerifyInstallationResponse<E> = NewInstallationResponse | UpdateInst
  * This function handles both new installations and re-installations or installation updates.
  */
 export async function verifyInstallation<E>({
-  asymmetricKeyProvider = new GotKeyProvider(),
+  asymmetricKeyProvider,
   authDataProvider,
   authorizationMethod = 'any',
   baseUrl,
@@ -156,7 +156,7 @@ export interface VerifyRequestResponse<E> {
  * This function handles API, frame-loading, context, and some app-lifecycle requests.
  */
 export async function verifyRequest<E>({
-  asymmetricKeyProvider = new GotKeyProvider(),
+  asymmetricKeyProvider,
   authDataProvider,
   authorizationMethod = 'any',
   baseUrl,

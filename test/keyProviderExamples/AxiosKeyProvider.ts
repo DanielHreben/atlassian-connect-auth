@@ -1,6 +1,6 @@
 import { AxiosInstance, AxiosRequestConfig, default as axios } from 'axios';
 
-import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from './KeyProvider';
+import { ConnectInstallKeysCdnUrl, EnvironmentType, KeyProvider } from '../../src';
 
 export interface AxiosKeyProviderEnvironmentArgs {
   environment?: EnvironmentType;

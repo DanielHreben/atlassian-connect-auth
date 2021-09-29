@@ -1,10 +1,8 @@
 import * as atlassianJwt from 'atlassian-jwt';
-import nock from 'nock';
 
 import {
   AuthError,
   AuthErrorCode,
-  ConnectInstallKeysCdnUrl,
   ConnectJwt,
   CredentialsWithEntity,
   InstallationQueryStringHashType,
@@ -54,7 +52,6 @@ const verifyInstallationArgs = ({
 
 afterEach(() => {
   jest.resetAllMocks();
-  nock.cleanAll();
 });
 
 describe('verifyInstallation with legacy authentication', () => {
@@ -229,26 +226,6 @@ describe('verifyInstallation with signed install', () => {
       });
       expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
       expect(keyProviderGet).toHaveBeenCalledWith('kid', payload);
-    });
-
-    test('first-time installation with default key provider', async () => {
-      nock(ConnectInstallKeysCdnUrl.production).get('/kid').reply(200, AsymmetricKey.publicKey);
-
-      const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
-
-      const result = await verifyInstallation({
-        baseUrl,
-        authDataProvider: new TestAuthDataProvider({ qsh, clientKey, jwt }),
-        credentialsLoader,
-        asymmetricKeyProvider: undefined,
-      });
-
-      expect(result).toStrictEqual({
-        type: InstallationType.newInstallation,
-        clientKey,
-        connectJwt: payload,
-      });
-      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
     });
 
     test('first-time installation without QSH checking', async () => {
