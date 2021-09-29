@@ -16,9 +16,9 @@ export function isAsymmetricAlgorithm(alg?: string): boolean {
 export function decodeUnverifiedConnectJwt(rawConnectJwt: string): ConnectJwt {
   try {
     const alg = atlassianJwt.getAlgorithm(rawConnectJwt) as string;
-    const kid = atlassianJwt.getKeyId(rawConnectJwt) as string;
 
     if (isAsymmetricAlgorithm(alg)) {
+      const kid = atlassianJwt.getKeyId(rawConnectJwt) as string;
       return {
         ...(kid ? { kid } : undefined),
         alg,
