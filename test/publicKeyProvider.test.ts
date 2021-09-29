@@ -3,13 +3,13 @@ import got from 'got';
 import nock from 'nock';
 
 import {
-  AxiosKeyProvider,
   CacheWrapper,
   CachingKeyProvider,
   ConnectInstallKeysCdnUrl,
   ConnectJwt,
   KeyProvider,
 } from '../src';
+import { AxiosKeyProvider } from '../src/publicKeyProvider/AxiosKeyProvider';
 import { GotKeyProvider } from '../src/publicKeyProvider/GotKeyProvider';
 import { NodeFetchKeyProvider } from '../src/publicKeyProvider/NodeFetchKeyProvider';
 

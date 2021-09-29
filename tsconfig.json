@@ -9,7 +9,7 @@
     "strict": true,
     "strictNullChecks": true,
     "esModuleInterop": true,
-    "importHelpers": true,
+    "importHelpers": false,
     "moduleResolution": "node",
     "noUnusedLocals": true,
     "resolveJsonModule": true,

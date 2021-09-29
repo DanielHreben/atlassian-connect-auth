@@ -16,16 +16,16 @@ For a deeper understanding of the concepts built into this library, please read 
 import {
   AuthError,
   AuthErrorCode,
-  AxiosKeyProvider,
   CredentialsWithEntity,
   ExpressReqAuthDataProvider,
   InstallationType,
   verifyInstallation,
   verifyRequest,
 } from 'atlassian-connect-auth'
+import { GotKeyProvider } from 'atlassian-connect-auth/dist/publicKeyProvider/GotKeyProvider'
 
 const baseUrl = 'https://your-app-base-url.com'
-const asymmetricKeyProvider = new AxiosKeyProvider()
+const asymmetricKeyProvider = new GotKeyProvider()
 
 async function loadInstallationEntity(clientKey: string): Promise<CredentialsWithEntity<InstallationEntity>> {
   const storedEntity = await model.InstallationEntity.findOne({ where: { clientKey } })
