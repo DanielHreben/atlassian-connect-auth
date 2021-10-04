@@ -1,6 +1,12 @@
 import { AuthDataProvider } from './authDataProvider';
 import { AuthError, AuthErrorCode } from './AuthError';
-import { decodeUnverifiedConnectJwt, verifyConnectJwt } from './Jwt';
+import {
+  decodeUnverifiedConnectJwt,
+  isAsymmetricAlgorithm,
+  verifyAsymmetricConnectJwt,
+  verifyConnectJwt,
+} from './Jwt';
+import { KeyProvider } from './publicKeyProvider';
 import { verifyQueryStringHash } from './QueryStringHash';
 import {
   ConnectJwt,
@@ -11,8 +17,10 @@ import {
 } from './types';
 
 interface CommonVerifyArgs<E, Q> {
-  baseUrl: string;
+  asymmetricKeyProvider: KeyProvider;
   authDataProvider: AuthDataProvider;
+  authorizationMethod?: 'sharedSecret' | 'publicKey' | 'any';
+  baseUrl: string;
   credentialsLoader: CredentialsLoader<E>;
   queryStringHashType?: Q;
 }
@@ -22,6 +30,7 @@ export type VerifyInstallationArgs<E> = CommonVerifyArgs<E, InstallationQueryStr
 export interface NewInstallationResponse {
   type: InstallationType.newInstallation;
   clientKey: string;
+  connectJwt?: ConnectJwt;
 }
 
 export interface UpdateInstallationResponse<E> {
@@ -33,40 +42,70 @@ export interface UpdateInstallationResponse<E> {
 
 export type VerifyInstallationResponse<E> = NewInstallationResponse | UpdateInstallationResponse<E>;
 
-export type VerifyRequestArgs<E> = CommonVerifyArgs<E, QueryStringHashType>;
-
-export interface VerifyRequestResponse<E> {
-  connectJwt: ConnectJwt;
-  storedEntity: E;
-}
-
 /**
  * Verifies a Connect request installation.
  * Use this function to make sure the request is valid before persisting any data.
  * This function handles both new installations and re-installations or installation updates.
  */
 export async function verifyInstallation<E>({
-  baseUrl,
+  asymmetricKeyProvider,
   authDataProvider,
+  authorizationMethod = 'any',
+  baseUrl,
   credentialsLoader,
   queryStringHashType,
 }: VerifyInstallationArgs<E>): Promise<VerifyInstallationResponse<E>> {
   const clientKey = authDataProvider.extractClientKey();
-
-  // Check issuer
   const rawConnectJwt = authDataProvider.extractConnectJwt();
+
+  // Parse unverified JWT
   let unverifiedConnectJwt;
   if (rawConnectJwt) {
     unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
-    if (unverifiedConnectJwt.iss !== clientKey) {
-      throw new AuthError('Wrong issuer', {
-        code: AuthErrorCode.WRONG_ISSUER,
-        unverifiedConnectJwt,
-      });
-    }
   }
 
-  // Check new installation
+  // Check for a signed installation
+  if (
+    authorizationMethod === 'publicKey' ||
+    (authorizationMethod === 'any' && isAsymmetricAlgorithm(unverifiedConnectJwt?.alg))
+  ) {
+    const connectJwt = await verifyAsymmetricallySignedRequest({
+      authDataProvider,
+      asymmetricKeyProvider,
+      baseUrl,
+      queryStringHashType,
+      unverifiedConnectJwt,
+    });
+
+    // New installation
+    const credentials = await credentialsLoader(clientKey);
+    if (!credentials) {
+      return {
+        type: InstallationType.newInstallation,
+        connectJwt,
+        clientKey,
+      };
+    }
+
+    // Installation update
+    return {
+      type: InstallationType.update,
+      clientKey,
+      connectJwt,
+      storedEntity: credentials.storedEntity,
+    };
+  }
+
+  // Fallback to unsigned installation
+  // In non-authenticated installs, we only check issuer if there's a JWT
+  if (unverifiedConnectJwt && unverifiedConnectJwt.iss !== clientKey) {
+    throw new AuthError('Wrong issuer', {
+      code: AuthErrorCode.WRONG_ISSUER,
+      unverifiedConnectJwt,
+    });
+  }
+
+  // Unsigned new installation
   const credentials = await credentialsLoader(clientKey);
   if (!credentials) {
     return {
@@ -74,12 +113,13 @@ export async function verifyInstallation<E>({
       clientKey,
     };
   }
+  const { sharedSecret, storedEntity } = credentials;
 
-  // Check installation update
+  // Verify installation update
   if (rawConnectJwt) {
     const connectJwt = verifyConnectJwt({
       rawConnectJwt,
-      sharedSecret: credentials.sharedSecret,
+      sharedSecret,
       unverifiedConnectJwt,
     });
 
@@ -93,13 +133,20 @@ export async function verifyInstallation<E>({
       type: InstallationType.update,
       clientKey,
       connectJwt,
-      storedEntity: credentials.storedEntity,
+      storedEntity,
     };
   }
 
   throw new AuthError('Unauthorized update request', {
     code: AuthErrorCode.UNAUTHORIZED_REQUEST,
   });
+}
+
+export type VerifyRequestArgs<E> = CommonVerifyArgs<E, QueryStringHashType>;
+
+export interface VerifyRequestResponse<E> {
+  connectJwt: ConnectJwt;
+  storedEntity: E;
 }
 
 /**
@@ -109,8 +156,10 @@ export async function verifyInstallation<E>({
  * This function handles API, frame-loading, context, and some app-lifecycle requests.
  */
 export async function verifyRequest<E>({
-  baseUrl,
+  asymmetricKeyProvider,
   authDataProvider,
+  authorizationMethod = 'any',
+  baseUrl,
   credentialsLoader,
   queryStringHashType,
 }: VerifyRequestArgs<E>): Promise<VerifyRequestResponse<E>> {
@@ -121,9 +170,29 @@ export async function verifyRequest<E>({
 
   // Load existing installation
   const unverifiedConnectJwt = decodeUnverifiedConnectJwt(rawConnectJwt);
+
   const credentials = await credentialsLoader(unverifiedConnectJwt.iss);
   if (!credentials) {
-    throw new AuthError('Unknown issuer', { code: AuthErrorCode.UNKNOWN_ISSUER });
+    throw new AuthError('Unknown issuer', {
+      code: AuthErrorCode.UNKNOWN_ISSUER,
+      unverifiedConnectJwt,
+    });
+  }
+
+  // Check for a signed uninstallation
+  if (
+    authorizationMethod === 'publicKey' ||
+    (authorizationMethod === 'any' && isAsymmetricAlgorithm(unverifiedConnectJwt.alg))
+  ) {
+    const connectJwt = await verifyAsymmetricallySignedRequest({
+      authDataProvider,
+      asymmetricKeyProvider,
+      baseUrl,
+      queryStringHashType,
+      unverifiedConnectJwt,
+    });
+
+    return { connectJwt, storedEntity: credentials.storedEntity };
   }
 
   const connectJwt = verifyConnectJwt({
@@ -139,4 +208,80 @@ export async function verifyRequest<E>({
   });
 
   return { connectJwt, storedEntity: credentials.storedEntity };
+}
+
+export interface verifySignedRequestArgs {
+  asymmetricKeyProvider: KeyProvider;
+  authDataProvider: AuthDataProvider;
+  baseUrl: string;
+  queryStringHashType?: QueryStringHashType;
+  unverifiedConnectJwt?: ConnectJwt;
+}
+
+/**
+ * Verifies a Connect request containing an asymmetrically signed JWT token.
+ */
+async function verifyAsymmetricallySignedRequest({
+  baseUrl,
+  authDataProvider,
+  asymmetricKeyProvider,
+  queryStringHashType,
+  unverifiedConnectJwt,
+}: verifySignedRequestArgs): Promise<ConnectJwt> {
+  // Check JWT
+  if (!unverifiedConnectJwt) {
+    throw new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT });
+  }
+
+  // Check issuer
+  const clientKey = authDataProvider.extractClientKey();
+  if (unverifiedConnectJwt.iss !== clientKey) {
+    throw new AuthError('Wrong issuer', {
+      code: AuthErrorCode.WRONG_ISSUER,
+      unverifiedConnectJwt,
+    });
+  }
+
+  // Check audience
+  if (!unverifiedConnectJwt.aud?.includes(baseUrl)) {
+    throw new AuthError('Wrong audience', {
+      code: AuthErrorCode.WRONG_AUDIENCE,
+      unverifiedConnectJwt,
+    });
+  }
+
+  if (!unverifiedConnectJwt.kid) {
+    throw new AuthError('Missing token kid', {
+      code: AuthErrorCode.MISSING_KID,
+      unverifiedConnectJwt,
+    });
+  }
+
+  // Fetch public key
+  let publicKey;
+  try {
+    publicKey = await asymmetricKeyProvider.get(unverifiedConnectJwt.kid, unverifiedConnectJwt);
+  } catch (error) {
+    throw new AuthError('Failed to obtain public key', {
+      code: AuthErrorCode.FAILED_TO_OBTAIN_PUBLIC_KEY,
+      originError: error,
+      unverifiedConnectJwt,
+    });
+  }
+
+  // Verify asymmetric JWT
+  const connectJwt = verifyAsymmetricConnectJwt({
+    rawConnectJwt: authDataProvider.extractConnectJwt(),
+    publicKey,
+    unverifiedConnectJwt,
+  });
+
+  // Verify QSH
+  verifyQueryStringHash({
+    queryStringHashType,
+    connectJwt,
+    computeQueryStringHashFunction: () => authDataProvider.computeQueryStringHash(baseUrl),
+  });
+
+  return connectJwt;
 }

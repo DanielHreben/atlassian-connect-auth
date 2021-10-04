@@ -1,217 +1,398 @@
 import * as atlassianJwt from 'atlassian-jwt';
 
-import { AuthError, AuthErrorCode, ConnectJwt, InstallationType, verifyInstallation } from '../src';
-import { TestAuthDataProvider } from './helpers/util';
+import {
+  AuthError,
+  AuthErrorCode,
+  ConnectJwt,
+  CredentialsWithEntity,
+  InstallationQueryStringHashType,
+  InstallationType,
+  KeyProvider,
+  verifyInstallation,
+  VerifyInstallationArgs,
+} from '../src';
+import { generateTestAsymmetricKeys } from './helpers/AsymmetricKey';
+import { TestAuthDataProvider } from './helpers/TestAuthDataProvider';
 
+const AsymmetricKey = generateTestAsymmetricKeys();
+const AlternativeAsymmetricKey = generateTestAsymmetricKeys();
 const baseUrl = 'https://test.example.com';
-const jiraClientKey = 'jira-client-key';
-const bitbucketClientKey = 'bitbucket-client-key';
+const clientKey = 'client-key';
+const sharedSecret = 'shh-secret-cat';
 const storedEntity = { appSpecificId: 1 };
-
-const jiraPayload = {
-  baseUrl: 'https://test.atlassian.net',
-  clientKey: jiraClientKey,
-  sharedSecret: 'shh-secret-cat',
+const credentials: CredentialsWithEntity<typeof storedEntity> = {
+  sharedSecret,
   storedEntity,
 };
+const credentialsLoader = jest.fn();
+const keyProviderGet = jest.fn();
+const asymmetricKeyProvider: KeyProvider = { get: keyProviderGet };
 
-const bitbucketPayload = {
-  principal: { uuid: 'bitbucket-workspace-id' },
-  clientKey: bitbucketClientKey,
-  sharedSecret: 'shh-secret-cat',
-  storedEntity,
-};
+type InstallArgs = VerifyInstallationArgs<typeof storedEntity>;
+type OverrideArgs = Partial<{
+  qsh: string;
+  jwt: string;
+  queryStringHashType: InstallationQueryStringHashType;
+  authorizationMethod: 'sharedSecret' | 'publicKey' | 'any';
+}>;
 
-describe('verifyInstallation', () => {
-  const loadCredentials = jest.fn();
+const verifyInstallationArgs = ({
+  qsh = '',
+  jwt = '',
+  queryStringHashType,
+  authorizationMethod,
+}: OverrideArgs = {}): InstallArgs => ({
+  baseUrl,
+  authDataProvider: new TestAuthDataProvider({ qsh, clientKey, jwt }),
+  credentialsLoader,
+  asymmetricKeyProvider,
+  queryStringHashType,
+  authorizationMethod,
+});
 
-  beforeEach(() => jest.clearAllMocks());
+afterEach(() => {
+  jest.resetAllMocks();
+});
 
-  test('First installation', async () => {
-    const clientKey = jiraClientKey;
-    const requestReader = new TestAuthDataProvider({ qsh: '', clientKey, jwt: '' });
+describe('verifyInstallation with legacy authentication', () => {
+  const symmetricJwt = ({ iss = clientKey, qsh = '', secret = '' } = {}) => {
+    const payload = { iss } as unknown as ConnectJwt;
+    if (qsh) payload.qsh = qsh;
+    const jwt = atlassianJwt.encodeSymmetric(payload, secret || sharedSecret);
+    return { payload: { ...payload, alg: 'HS256' }, jwt };
+  };
 
-    const result = await verifyInstallation({
-      baseUrl,
-      authDataProvider: requestReader,
-      credentialsLoader: loadCredentials,
+  describe('succeeds for', () => {
+    test('first-time installation', async () => {
+      const result = await verifyInstallation(verifyInstallationArgs());
+
+      expect(result).toStrictEqual({
+        type: InstallationType.newInstallation,
+        clientKey,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
     });
 
-    expect(result).toStrictEqual({
-      type: InstallationType.newInstallation,
-      clientKey,
+    test('first-time installation without QSH checking', async () => {
+      const result = await verifyInstallation(
+        verifyInstallationArgs({ queryStringHashType: 'skip' })
+      );
+
+      expect(result).toStrictEqual({
+        type: InstallationType.newInstallation,
+        clientKey,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
     });
-    expect(loadCredentials).toHaveBeenCalledWith(clientKey);
+
+    test('Installation update', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const qsh = 'valid';
+      const { payload, jwt } = symmetricJwt({ qsh });
+
+      const result = await verifyInstallation(verifyInstallationArgs({ jwt, qsh }));
+
+      expect(result).toStrictEqual({
+        type: InstallationType.update,
+        clientKey,
+        connectJwt: payload,
+        storedEntity,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
+
+    test('Installation update without QSH checking', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = symmetricJwt();
+
+      const result = await verifyInstallation(
+        verifyInstallationArgs({ jwt, queryStringHashType: 'skip' })
+      );
+
+      expect(result).toStrictEqual({
+        type: InstallationType.update,
+        clientKey,
+        connectJwt: payload,
+        storedEntity,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
   });
 
-  test('First installation without QSH checking', async () => {
-    const clientKey = bitbucketClientKey;
-    const requestReader = new TestAuthDataProvider({ qsh: '', clientKey, jwt: '' });
-
-    const result = await verifyInstallation({
-      baseUrl,
-      authDataProvider: requestReader,
-      credentialsLoader: loadCredentials,
-      queryStringHashType: 'skip',
+  describe('fails', () => {
+    test('to decode token', async () => {
+      await expect(
+        verifyInstallation(verifyInstallationArgs({ jwt: 'abc.def.ghi' }))
+      ).rejects.toMatchError(
+        new AuthError('Failed to decode token', {
+          code: AuthErrorCode.FAILED_TO_DECODE,
+          originError: new SyntaxError('Unexpected token i in JSON at position 0'),
+        })
+      );
     });
 
-    expect(result).toStrictEqual({
-      type: InstallationType.newInstallation,
-      clientKey,
+    test('because JWT issuer is different than clientKey', async () => {
+      const { payload, jwt } = symmetricJwt({ iss: 'not-clientKey' });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Wrong issuer', {
+          code: AuthErrorCode.WRONG_ISSUER,
+          unverifiedConnectJwt: payload,
+        })
+      );
     });
-    expect(loadCredentials).toHaveBeenCalledWith(clientKey);
+
+    test('because QSH is missing', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = symmetricJwt();
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('JWT did not contain the Query String Hash (QSH) claim', {
+          code: AuthErrorCode.MISSING_QSH,
+          connectJwt: payload,
+        })
+      );
+    });
+
+    test('because QSH is invalid', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = symmetricJwt({ qsh: 'valid' });
+
+      await expect(
+        verifyInstallation(verifyInstallationArgs({ jwt, qsh: 'invalid' }))
+      ).rejects.toMatchError(
+        new AuthError('Invalid QSH', {
+          code: AuthErrorCode.INVALID_QSH,
+          connectJwt: payload,
+          qshInfo: { computed: 'invalid', received: 'valid' },
+        })
+      );
+    });
+
+    test('because JWT is missing on installation update', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      await expect(verifyInstallation(verifyInstallationArgs())).rejects.toMatchError(
+        new AuthError('Unauthorized update request', { code: AuthErrorCode.UNAUTHORIZED_REQUEST })
+      );
+    });
+
+    test('because JWT signature is invalid', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = symmetricJwt({ secret: 'invalid-shared-secret' });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Invalid signature', {
+          code: AuthErrorCode.INVALID_SIGNATURE,
+          originError: new Error(
+            'Signature verification failed for input: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjbGllbnQta2V5In0 with method sha256'
+          ),
+          unverifiedConnectJwt: payload,
+        })
+      );
+    });
   });
+});
 
-  test('Failed to decode token', async () => {
-    const requestReader = new TestAuthDataProvider({
-      qsh: '',
-      clientKey: jiraClientKey,
-      jwt: 'abc.def.ghi',
-    });
-
-    await expect(
-      verifyInstallation({
-        baseUrl,
-        authDataProvider: requestReader,
-        credentialsLoader: loadCredentials,
-      })
-    ).rejects.toMatchError(
-      new AuthError('Failed to decode token', {
-        code: AuthErrorCode.FAILED_TO_DECODE,
-        originError: new SyntaxError('Unexpected token i in JSON at position 0'),
-      })
+describe('verifyInstallation with signed install', () => {
+  const qsh = 'valid';
+  const asymmetricJwt = ({ iss = clientKey, qsh = '', aud = '', pk = '', kid = 'kid' } = {}) => {
+    const payload = { iss, ...(aud ? { aud: [aud] } : undefined) } as unknown as ConnectJwt;
+    if (qsh) payload.qsh = qsh;
+    const jwt = atlassianJwt.encodeAsymmetric(
+      payload,
+      pk || AsymmetricKey.privateKey,
+      atlassianJwt.AsymmetricAlgorithm.RS256,
+      {
+        kid,
+      }
     );
+    return { payload: { ...payload, ...(kid ? { kid } : undefined), alg: 'RS256' }, jwt };
+  };
+
+  describe('succeeds for', () => {
+    beforeEach(() => {
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
+    });
+
+    test('first-time installation', async () => {
+      const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
+
+      const result = await verifyInstallation(verifyInstallationArgs({ jwt, qsh }));
+
+      expect(result).toStrictEqual({
+        type: InstallationType.newInstallation,
+        clientKey,
+        connectJwt: payload,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+      expect(keyProviderGet).toHaveBeenCalledWith('kid', payload);
+    });
+
+    test('first-time installation without QSH checking', async () => {
+      const { payload, jwt } = asymmetricJwt({ qsh: 'random', aud: baseUrl });
+
+      const result = await verifyInstallation(
+        verifyInstallationArgs({ jwt, qsh, queryStringHashType: 'skip' })
+      );
+
+      expect(result).toStrictEqual({
+        type: InstallationType.newInstallation,
+        clientKey,
+        connectJwt: payload,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
+
+    test('installation update', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = asymmetricJwt({ qsh, aud: baseUrl });
+
+      const result = await verifyInstallation(verifyInstallationArgs({ jwt, qsh }));
+
+      expect(result).toStrictEqual({
+        type: InstallationType.update,
+        clientKey,
+        connectJwt: payload,
+        storedEntity,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
+
+    test('installation update without QSH checking', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      const { payload, jwt } = asymmetricJwt({ qsh: 'random', aud: baseUrl });
+
+      const result = await verifyInstallation(
+        verifyInstallationArgs({ jwt, queryStringHashType: 'skip' })
+      );
+
+      expect(result).toStrictEqual({
+        type: InstallationType.update,
+        clientKey,
+        connectJwt: payload,
+        storedEntity,
+      });
+      expect(credentialsLoader).toHaveBeenCalledWith(clientKey);
+    });
   });
 
-  test('Passed different id in body and authorization header', async () => {
-    const clientKey = jiraClientKey;
-    const jwtContent = { iss: 'different-id' } as unknown as ConnectJwt;
-    const jwt = atlassianJwt.encodeSymmetric(jwtContent, jiraPayload.sharedSecret);
-    const requestReader = new TestAuthDataProvider({
-      qsh: '',
-      clientKey,
-      jwt,
+  describe('fails', () => {
+    test('because JWT is missing', async () => {
+      await expect(
+        verifyInstallation(verifyInstallationArgs({ authorizationMethod: 'publicKey' }))
+      ).rejects.toMatchError(new AuthError('Missing JWT', { code: AuthErrorCode.MISSING_JWT }));
     });
 
-    await expect(
-      verifyInstallation({
-        baseUrl,
-        authDataProvider: requestReader,
-        credentialsLoader: loadCredentials,
-      })
-    ).rejects.toMatchError(
-      new AuthError('Wrong issuer', {
-        code: AuthErrorCode.WRONG_ISSUER,
-        unverifiedConnectJwt: jwtContent,
-      })
-    );
+    test('because JWT issuer is different than clientKey', async () => {
+      const { payload, jwt } = asymmetricJwt({ iss: 'not-clientKey' });
 
-    expect(loadCredentials).not.toHaveBeenCalledWith(clientKey);
-  });
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Wrong issuer', {
+          code: AuthErrorCode.WRONG_ISSUER,
+          unverifiedConnectJwt: payload,
+        })
+      );
 
-  test('Second and subsequent installation of Jira add-on with no qsh', async () => {
-    loadCredentials.mockReturnValue(jiraPayload);
-    const clientKey = jiraClientKey;
-    const jwtContent = { iss: jiraPayload.clientKey } as unknown as ConnectJwt;
-    const jwt = atlassianJwt.encodeSymmetric(jwtContent, jiraPayload.sharedSecret);
-    const requestReader = new TestAuthDataProvider({
-      qsh: '',
-      clientKey,
-      jwt,
+      expect(credentialsLoader).not.toHaveBeenCalledWith(clientKey);
     });
 
-    await expect(
-      verifyInstallation({
-        baseUrl,
-        authDataProvider: requestReader,
-        credentialsLoader: loadCredentials,
-      })
-    ).rejects.toMatchError(
-      new AuthError('JWT did not contain the Query String Hash (QSH) claim', {
-        code: AuthErrorCode.MISSING_QSH,
-        connectJwt: jwtContent,
-      })
-    );
-  });
+    test('because JWT aud is different than baseUrl', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      const { payload, jwt } = asymmetricJwt({ aud: 'https://invalid.com' });
 
-  test('Second and subsequent installation of Bitbucket add-on with no qsh', async () => {
-    loadCredentials.mockReturnValue(bitbucketPayload);
-    const clientKey = bitbucketClientKey;
-    const jwtContent = {
-      iss: bitbucketPayload.clientKey,
-      qsh: 'context-qsh',
-    };
-    const jwt = atlassianJwt.encodeSymmetric(jwtContent, bitbucketPayload.sharedSecret);
-    const requestReader = new TestAuthDataProvider({
-      qsh: '',
-      clientKey,
-      jwt,
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Wrong audience', {
+          code: AuthErrorCode.WRONG_AUDIENCE,
+          unverifiedConnectJwt: payload,
+        })
+      );
     });
 
-    const result = await verifyInstallation({
-      baseUrl,
-      authDataProvider: requestReader,
-      credentialsLoader: loadCredentials,
-      queryStringHashType: 'skip',
+    test('because JWT aud is missing', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      const { payload, jwt } = asymmetricJwt({ aud: undefined });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Wrong audience', {
+          code: AuthErrorCode.WRONG_AUDIENCE,
+          unverifiedConnectJwt: payload,
+        })
+      );
+    });
+    //
+    test('because JWT kid is missing', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      const { payload, jwt } = asymmetricJwt({ aud: baseUrl, kid: '' });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Missing token kid', {
+          code: AuthErrorCode.MISSING_KID,
+          unverifiedConnectJwt: payload,
+        })
+      );
     });
 
-    expect(result).toStrictEqual({
-      type: InstallationType.update,
-      clientKey,
-      connectJwt: jwtContent,
-      storedEntity,
-    });
-    expect(loadCredentials).toHaveBeenCalledWith(clientKey);
-  });
+    test('when fetching public key', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      const originError = new Error('http error');
+      keyProviderGet.mockRejectedValue(originError);
+      const { payload, jwt } = asymmetricJwt({ aud: baseUrl });
 
-  test('Second and subsequent Jira add-on installation', async () => {
-    loadCredentials.mockReturnValue(jiraPayload);
-    const clientKey = jiraClientKey;
-    const qsh = 'valid';
-    const jwtContent = {
-      iss: jiraPayload.clientKey,
-      qsh,
-    };
-    const jwt = atlassianJwt.encodeSymmetric(jwtContent, jiraPayload.sharedSecret);
-    const requestReader = new TestAuthDataProvider({
-      qsh,
-      clientKey,
-      jwt,
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Failed to obtain public key', {
+          code: AuthErrorCode.FAILED_TO_OBTAIN_PUBLIC_KEY,
+          originError,
+          unverifiedConnectJwt: payload,
+        })
+      );
     });
 
-    const result = await verifyInstallation({
-      baseUrl,
-      authDataProvider: requestReader,
-      credentialsLoader: loadCredentials,
+    test('because QSH is missing', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
+      const { payload, jwt } = asymmetricJwt({ aud: baseUrl });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('JWT did not contain the Query String Hash (QSH) claim', {
+          code: AuthErrorCode.MISSING_QSH,
+          connectJwt: payload,
+        })
+      );
     });
 
-    expect(result).toStrictEqual({
-      type: InstallationType.update,
-      clientKey,
-      connectJwt: jwtContent,
-      storedEntity,
-    });
-    expect(loadCredentials).toHaveBeenCalledWith(clientKey);
-  });
+    test('because QSH is invalid', async () => {
+      credentialsLoader.mockReturnValue(storedEntity);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
+      const { payload, jwt } = asymmetricJwt({ qsh: 'valid', aud: baseUrl });
 
-  test('Unauthorized request to updated existing instance', async () => {
-    loadCredentials.mockReturnValue(jiraPayload);
-    const clientKey = jiraClientKey;
-    const requestReader = new TestAuthDataProvider({
-      qsh: '',
-      clientKey,
-      jwt: '',
+      await expect(
+        verifyInstallation(verifyInstallationArgs({ jwt, qsh: 'invalid' }))
+      ).rejects.toMatchError(
+        new AuthError('Invalid QSH', {
+          code: AuthErrorCode.INVALID_QSH,
+          connectJwt: payload,
+          qshInfo: { computed: 'invalid', received: 'valid' },
+        })
+      );
     });
 
-    await expect(
-      verifyInstallation({
-        baseUrl,
-        authDataProvider: requestReader,
-        credentialsLoader: loadCredentials,
-      })
-    ).rejects.toMatchError(
-      new AuthError('Unauthorized update request', { code: AuthErrorCode.UNAUTHORIZED_REQUEST })
-    );
-    expect(loadCredentials).toHaveBeenCalledWith(clientKey);
+    test('because JWT signature is invalid', async () => {
+      credentialsLoader.mockReturnValue(credentials);
+      keyProviderGet.mockResolvedValue(AsymmetricKey.publicKey);
+      const { payload, jwt } = asymmetricJwt({
+        aud: baseUrl,
+        pk: AlternativeAsymmetricKey.privateKey,
+      });
+
+      await expect(verifyInstallation(verifyInstallationArgs({ jwt }))).rejects.toMatchError(
+        new AuthError('Invalid signature', {
+          code: AuthErrorCode.INVALID_SIGNATURE,
+          originError: new Error(
+            'Signature verification failed for input: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtpZCJ9.eyJpc3MiOiJjbGllbnQta2V5IiwiYXVkIjpbImh0dHBzOi8vdGVzdC5leGFtcGxlLmNvbSJdfQ with method RSA-SHA256'
+          ),
+          unverifiedConnectJwt: payload,
+        })
+      );
+    });
   });
 });

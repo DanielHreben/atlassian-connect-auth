@@ -23,7 +23,12 @@ import {
   verifyRequest,
 } from 'atlassian-connect-auth'
 
+// Consumers of this library have to provide a KeyProvider implementation that will fetch the public key from a CDN.
+// Examples can be found under the `test` directory in this library.
+import { GotKeyProvider } from './GotKeyProvider';
+
 const baseUrl = 'https://your-app-base-url.com'
+const asymmetricKeyProvider = new GotKeyProvider()
 
 async function loadInstallationEntity(clientKey: string): Promise<CredentialsWithEntity<InstallationEntity>> {
   const storedEntity = await model.InstallationEntity.findOne({ where: { clientKey } })
@@ -39,6 +44,7 @@ const handleInstallation = async (req, res) => {
   try {
     const result = await verifyInstallation({
       baseUrl,
+      asymmetricKeyProvider,
       authDataProvider: new ExpressReqAuthDataProvider(req),
       credentialsLoader: loadInstallationEntity,
     })
@@ -68,6 +74,7 @@ const handleAuth = async (req, res, next) => {
   try {
     const { connectJwt, storedEntity } = await verifyRequest({
       baseUrl,
+      asymmetricKeyProvider,
       authDataProvider: new ExpressReqAuthDataProvider(req),
       credentialsLoader: loadInstallationEntity,
       queryStringHashType: 'context',
