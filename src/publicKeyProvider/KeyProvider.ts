@@ -12,7 +12,7 @@ export interface KeyProvider {
  */
 export enum ConnectInstallKeysCdnUrl {
   production = 'https://connect-install-keys.atlassian.com',
-  staging = 'https://cs-migrations--cdn.us-east-1.staging.public.atl-paas.net',
+  staging = 'https://asap-distribution.us-west-2.staging.atl-asap.net',
 }
 
 export type EnvironmentType = keyof typeof ConnectInstallKeysCdnUrl;
