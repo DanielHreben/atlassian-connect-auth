@@ -1,3 +1,8 @@
+# Atlassian Conenct is deprecated
+Do not use this libray. 
+
+See [Announcing Connect End of Support: Timeline and Next Steps](https://www.atlassian.com/blog/developer/announcing-connect-end-of-support-timeline-and-next-steps)
+
 # atlassian-connect-auth
 
 [![Known Vulnerabilities](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth/badge.svg?targetFile=package.json)](https://snyk.io/test/github/DanielHreben/atlassian-connect-auth?targetFile=package.json)
